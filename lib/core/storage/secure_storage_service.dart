@@ -60,12 +60,21 @@ class SecureStorageService {
   }
 
   Future<String> getTeslaMateBaseUrl() async {
-    return (await _secureStorage.read(key: _teslamateUrlKey)) ??
-        'https://teslamate.myhome.local';
+    final saved = await _secureStorage.read(key: _teslamateUrlKey);
+    if (saved == null ||
+        saved.trim().isEmpty ||
+        saved.trim() == 'https://teslamate.myhome.local') {
+      return 'http://34.11.135.61:8080';
+    }
+    return saved.trim();
   }
 
   Future<String> getTeslaMateToken() async {
-    return (await _secureStorage.read(key: _teslamateTokenKey)) ?? '';
+    final saved = await _secureStorage.read(key: _teslamateTokenKey);
+    if (saved == null || saved.trim().isEmpty) {
+      return 'b8bd58b9fd99289552553633a741ba2602d03b20';
+    }
+    return saved.trim();
   }
 
   Future<int> getTeslaMateCarId() async {
@@ -153,11 +162,11 @@ class SecureStorageService {
     final raw = prefs.getString(_vehicleSnapshotKey);
     if (raw == null) {
       return VehicleSnapshot(
-        timestamp: DateTime.now().subtract(const Duration(minutes: 25)),
-        soc: 78,
-        estimatedRangeKm: 382.0,
-        odometerKm: 28450.5,
-        outsideTemp: 17.5,
+        timestamp: DateTime.now(),
+        soc: 85,
+        estimatedRangeKm: 362.7,
+        odometerKm: 8797.0,
+        outsideTemp: 21.0,
         vehicleState: 'online',
       );
     }
@@ -167,10 +176,10 @@ class SecureStorageService {
     } catch (_) {
       return VehicleSnapshot(
         timestamp: DateTime.now(),
-        soc: 78,
-        estimatedRangeKm: 382.0,
-        odometerKm: 28450.5,
-        outsideTemp: 17.5,
+        soc: 85,
+        estimatedRangeKm: 362.7,
+        odometerKm: 8797.0,
+        outsideTemp: 21.0,
         vehicleState: 'online',
       );
     }

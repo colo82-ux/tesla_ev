@@ -339,10 +339,10 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
             isLoading: true,
             snapshot: VehicleSnapshot(
               timestamp: DateTime.now(),
-              soc: 78,
-              estimatedRangeKm: 382.0,
-              odometerKm: 28450.5,
-              outsideTemp: 17.5,
+              soc: 85,
+              estimatedRangeKm: 362.7,
+              odometerKm: 8797.0,
+              outsideTemp: 21.0,
               vehicleState: 'online',
             ),
           ),
@@ -478,6 +478,13 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
   Future<void> resetWithMockData() async {
     state = state.copyWith(isLoading: true);
     await DatabaseHelper.instance.resetWithMockData();
+    await loadAll();
+  }
+
+  /// 샘플(더미) 기록 전체 삭제 및 실차 동기화 준비
+  Future<void> clearAllSampleLogs() async {
+    state = state.copyWith(isLoading: true);
+    await DatabaseHelper.instance.clearAllSampleLogs();
     await loadAll();
   }
 

@@ -401,6 +401,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                               OutlinedButton.icon(
                                 onPressed: () async {
+                                  await notifier.clearAllSampleLogs();
+                                  await notifier.syncNow();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          '샘플(더미) 기록을 모두 비우고 실제 차량 데이터로 동기화했습니다.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(
+                                    Icons.cleaning_services_rounded,
+                                    size: 18),
+                                label: const Text('샘플 기록 비우기 (실차 전용)'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () async {
                                   await notifier.resetWithMockData();
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -414,7 +433,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 },
                                 icon: const Icon(Icons.auto_fix_high_rounded,
                                     size: 18),
-                                label: const Text('더미 데이터 초기화'),
+                                label: const Text('더미 데이터 재생성'),
                               ),
                             ],
                           ),

@@ -101,32 +101,32 @@ class SyncService {
         );
       }
 
-      // 차량 최신 스냅샷 갱신 (TeslaMate 실시간 /status 우선 반영)
+      // 차량 최신 스냅샷 갱신 (TeslaMate 실시간 /status 및 :4000 웹 상태 우선 반영)
       final liveStatus = await client.fetchCarStatus();
       final prevSnapshot = await _storage.getVehicleSnapshot();
       final now = DateTime.now();
 
+      final VehicleSnapshot finalSnapshot;
       if (liveStatus != null) {
-        await _storage.saveVehicleSnapshot(liveStatus.copyWith(timestamp: now));
+        finalSnapshot = liveStatus.copyWith(timestamp: now);
       } else {
         final addedKm = drives.fold<double>(0.0, (s, e) => s + e.distanceKm);
         final latestSoc = charges.isNotEmpty
             ? charges.first.endSoc
             : (drives.isNotEmpty ? drives.first.endSoc : prevSnapshot.soc);
 
-        await _storage.saveVehicleSnapshot(
-          prevSnapshot.copyWith(
-            timestamp: now,
-            soc: latestSoc,
-            odometerKm: double.parse(
-              (prevSnapshot.odometerKm + addedKm).toStringAsFixed(1),
-            ),
-            estimatedRangeKm:
-                double.parse((latestSoc * 4.9).toStringAsFixed(1)),
-            vehicleState: 'online',
+        finalSnapshot = prevSnapshot.copyWith(
+          timestamp: now,
+          soc: latestSoc,
+          odometerKm: double.parse(
+            (prevSnapshot.odometerKm + addedKm).toStringAsFixed(1),
           ),
+          estimatedRangeKm:
+              double.parse((latestSoc * 4.27).toStringAsFixed(1)),
+          vehicleState: 'online',
         );
       }
+      await _storage.saveVehicleSnapshot(finalSnapshot);
       await _storage.setLastSyncTime(now);
 
       return SyncResult(
@@ -135,13 +135,13 @@ class SyncService {
         syncedCharges: chargeCount,
         timestamp: now,
         message:
-            'TeslaMate 동기화 완료: 주행 ${driveCount}건, 충전 ${chargeCount}건 반영',
+            'TeslaMate 동기화 완료 (배터리 ${finalSnapshot.soc}%, 누적 ${finalSnapshot.odometerKm}km · 주행 ${driveCount}건, 충전 ${chargeCount}건)',
       );
     } catch (e) {
       // 실제 서버에 닿을 수 없는 로컬 테스트 환경일 경우 시뮬레이션 결과 제공
       return _simulateDemoSync(
         SyncMode.teslamate,
-        fallbackReason: '서버 연결 실패로 데모 동기화 실행',
+        fallbackReason: '서버 연결 실패($e)로 데모 동기화 실행',
       );
     }
   }

@@ -158,6 +158,17 @@ class DatabaseHelper {
     await MockDataSeeder.seedInitialData(db);
   }
 
+  /// 샘플(더미) 주행/충전/지출 기록을 모두 비우고 실차 연동 데이터만 남기기
+  Future<void> clearAllSampleLogs() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(tableDriveLogs);
+      await txn.delete(tableChargeLogs);
+      await txn.delete(tableExpenseLogs);
+      await txn.delete(tableVampireDrainLogs);
+    });
+  }
+
   /// 로컬 SQLite 전체 데이터를 JSON 문자열로 내보내기
   Future<String> exportToJsonString() async {
     final db = await database;

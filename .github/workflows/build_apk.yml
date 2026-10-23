@@ -48,10 +48,12 @@ jobs:
           cp /tmp/tesla_ev_backup/pubspec.yaml .
           cp /tmp/tesla_ev_backup/analysis_options.yaml .
 
-          # AndroidManifest.xml에 인터넷 권한(TeslaMate / Fleet API 통신용) 및 앱 이름('테슬라_ev') 설정
+          # AndroidManifest.xml에 인터넷 권한, HTTP 평문 통신 허용(usesCleartextTraffic), 앱 이름('테슬라_ev') 설정
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
-            sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' "$MANIFEST"
+            sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/' "$MANIFEST"
+          else
+            sed -i 's/<application/<application android:usesCleartextTraffic="true"/' "$MANIFEST"
           fi
           sed -i 's/android:label="tesla_ev"/android:label="테슬라_ev"/g' "$MANIFEST"
 
