@@ -1,0 +1,85 @@
+name: Build Tesla_EV Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # GitHub 웹페이지에서 수동으로도 즉시 [Run workflow] 버튼 클릭 가능
+
+jobs:
+  build-android-apk:
+    name: Build Release APK (Flutter)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 3. Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+          cache: true
+
+      - name: 4. Generate Android Platform Scaffolding & Configure Manifest
+        run: |
+          # 기존 커스텀 소스 백업 (flutter create가 기본 템플릿으로 덮어쓰지 않도록 보호)
+          mkdir -p /tmp/tesla_ev_backup
+          cp -r lib /tmp/tesla_ev_backup/
+          cp -r test /tmp/tesla_ev_backup/
+          cp pubspec.yaml /tmp/tesla_ev_backup/
+          cp analysis_options.yaml /tmp/tesla_ev_backup/
+
+          # Android 네이티브 폴더 생성
+          flutter create --platforms=android --org com.teslaev.app --project-name tesla_ev .
+
+          # 백업해둔 테슬라_ev 소스 및 테스트 복원
+          rm -rf lib test
+          cp -r /tmp/tesla_ev_backup/lib .
+          cp -r /tmp/tesla_ev_backup/test .
+          cp /tmp/tesla_ev_backup/pubspec.yaml .
+          cp /tmp/tesla_ev_backup/analysis_options.yaml .
+
+          # AndroidManifest.xml에 인터넷 권한(TeslaMate / Fleet API 통신용) 및 앱 이름('테슬라_ev') 설정
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' "$MANIFEST"
+          fi
+          sed -i 's/android:label="tesla_ev"/android:label="테슬라_ev"/g' "$MANIFEST"
+
+          # flutter_secure_storage 호환을 위해 minSdk를 23으로 설정
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' android/app/build.gradle
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' android/app/build.gradle
+          fi
+          if [ -f "android/app/build.gradle.kts" ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' android/app/build.gradle.kts
+          fi
+
+      - name: 5. Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: 6. Run Unit Tests
+        run: flutter test
+
+      - name: 7. Build Release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: 8. Rename APK for Easy Download
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/tesla_ev-release.apk
+
+      - name: 9. Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tesla_ev-android-apk
+          path: build/app/outputs/flutter-apk/tesla_ev-release.apk
+          retention-days: 30

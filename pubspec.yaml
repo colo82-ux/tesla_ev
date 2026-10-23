@@ -1,0 +1,43 @@
+name: tesla_ev
+description: "개인용 테슬라 전비 분석 및 차계부 모바일 앱 (Offline-first SQLite + TeslaMate / Tesla Fleet API Sync)"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Local Database (SQLite)
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+
+  # Network & API
+  dio: ^5.7.0
+
+  # Secure Storage & Preferences
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.2
+
+  # Charts & UI
+  fl_chart: ^0.69.0
+  intl: ^0.19.0
+
+  # Backup / Export Utilities
+  share_plus: ^10.0.2
+  file_picker: ^8.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
