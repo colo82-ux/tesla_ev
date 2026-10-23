@@ -13,7 +13,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static const String dbName = 'tesla_ev_offline.db';
-  static const int dbVersion = 1;
+  static const int dbVersion = 2;
 
   // 테이블 명 상수
   static const String tableDriveLogs = 'drive_logs';
@@ -36,6 +36,7 @@ class DatabaseHelper {
       path,
       version: dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -57,12 +58,12 @@ class DatabaseHelper {
       )
     ''');
 
-    // 2. charge_logs (충전 기록)
+    // 2. charge_logs (충전 기록 - '회사(완속)' 포함)
     await db.execute('''
       CREATE TABLE $tableChargeLogs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
-        location_type TEXT NOT NULL CHECK(location_type IN ('수퍼차저', '집밥(완속)', '공용급속', '기타')),
+        location_type TEXT NOT NULL CHECK(location_type IN ('수퍼차저', '집밥(완속)', '회사(완속)', '공용급속', '기타')),
         added_energy_kwh REAL NOT NULL,
         unit_price_krw INTEGER NOT NULL,
         total_cost_krw INTEGER NOT NULL,
@@ -111,6 +112,37 @@ class DatabaseHelper {
 
     // 초기 실행 시 현실적인 테슬라 더미 데이터 시딩
     await MockDataSeeder.seedInitialData(db);
+  }
+
+  /// DB 스키마 업그레이드 (v1 -> v2: '회사(완속)' 허용 및 월별 차트용 과거 샘플 보강)
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.transaction((txn) async {
+        final existingCharges = await txn.query(tableChargeLogs);
+        await txn.execute('DROP TABLE IF EXISTS $tableChargeLogs');
+        await txn.execute('''
+          CREATE TABLE $tableChargeLogs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            location_type TEXT NOT NULL CHECK(location_type IN ('수퍼차저', '집밥(완속)', '회사(완속)', '공용급속', '기타')),
+            added_energy_kwh REAL NOT NULL,
+            unit_price_krw INTEGER NOT NULL,
+            total_cost_krw INTEGER NOT NULL,
+            start_soc INTEGER NOT NULL,
+            end_soc INTEGER NOT NULL,
+            UNIQUE(date, location_type)
+          )
+        ''');
+        for (final row in existingCharges) {
+          await txn.insert(
+            tableChargeLogs,
+            row,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      });
+      await MockDataSeeder.seedHistoricalMonthlyDataIfNeeded(db);
+    }
   }
 
   /// 더미 데이터 초기화 및 재성성

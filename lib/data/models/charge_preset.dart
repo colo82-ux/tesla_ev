@@ -17,6 +17,11 @@ class ChargePreset {
       unitPriceKrw: 250,
     ),
     ChargePreset(
+      name: '회사 완속 충전',
+      locationType: '회사(완속)',
+      unitPriceKrw: 200,
+    ),
+    ChargePreset(
       name: '테슬라 수퍼차저',
       locationType: '수퍼차저',
       unitPriceKrw: 420,

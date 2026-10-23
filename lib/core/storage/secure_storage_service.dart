@@ -185,9 +185,21 @@ class SecureStorageService {
     }
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      return list
+      final saved = list
           .map((e) => ChargePreset.fromMap(e as Map<String, dynamic>))
           .toList();
+
+      // 기존 설치 버전에서 새로 추가된 기본 프리셋(예: '회사(완속)')이 누락되어 있다면 자동 병합
+      for (final def in ChargePreset.defaultPresets) {
+        final exists = saved.any((p) => p.locationType == def.locationType);
+        if (!exists) {
+          saved.insert(
+            saved.length >= 2 ? 1 : saved.length,
+            def,
+          );
+        }
+      }
+      return saved;
     } catch (_) {
       return ChargePreset.defaultPresets;
     }

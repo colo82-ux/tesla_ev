@@ -2,6 +2,7 @@ import '../../core/utils/unit_converter.dart';
 import '../models/charge_log.dart';
 import '../models/drive_log.dart';
 import '../models/charge_preset.dart';
+import '../models/vehicle_snapshot.dart';
 import 'dio_client.dart';
 
 /// 모드 A: TeslaMate REST API 클라이언트
@@ -150,6 +151,11 @@ class TeslaMateApiClient {
       if (rawLocation.contains('supercharger') ||
           rawLocation.contains('수퍼차저')) {
         locationType = '수퍼차저';
+      } else if (rawLocation.contains('work') ||
+          rawLocation.contains('office') ||
+          rawLocation.contains('회사') ||
+          rawLocation.contains('직장')) {
+        locationType = '회사(완속)';
       } else if (rawLocation.contains('home') ||
           rawLocation.contains('집') ||
           rawLocation.contains('apt')) {
@@ -199,5 +205,55 @@ class TeslaMateApiClient {
     }
 
     return results;
+  }
+
+  /// TeslaMate 실시간 차량 상태 조회 (`GET /api/v1/cars/1/status`)
+  Future<VehicleSnapshot?> fetchCarStatus() async {
+    try {
+      final dio = DioClient.create(baseUrl: baseUrl, bearerToken: bearerToken);
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/v1/cars/$carId/status',
+      );
+      final data = response.data ?? {};
+      final status =
+          (data['data']?['status'] ?? data['status'] ?? {}) as Map<String, dynamic>;
+      if (status.isEmpty) return null;
+
+      final batteryDetails =
+          status['battery_details'] as Map<String, dynamic>? ?? const {};
+      final carDetails =
+          status['car_details'] as Map<String, dynamic>? ?? const {};
+      final climateDetails =
+          status['climate_details'] as Map<String, dynamic>? ?? const {};
+
+      final soc = ((batteryDetails['battery_level'] ??
+                  status['battery_level'] ??
+                  78) as num)
+              .toInt();
+      final estRange = ((batteryDetails['rated_battery_range'] ??
+                  batteryDetails['est_battery_range'] ??
+                  (soc * 4.9)) as num)
+              .toDouble();
+      final odo = ((status['odometer'] ??
+                  carDetails['odometer'] ??
+                  28450.5) as num)
+              .toDouble();
+      final outsideTemp = ((climateDetails['outside_temp'] ??
+                  status['outside_temp'] ??
+                  18.0) as num)
+              .toDouble();
+      final stateStr = (status['state'] ?? 'online').toString();
+
+      return VehicleSnapshot(
+        timestamp: DateTime.now(),
+        soc: soc,
+        estimatedRangeKm: double.parse(estRange.toStringAsFixed(1)),
+        odometerKm: double.parse(odo.toStringAsFixed(1)),
+        outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
+        vehicleState: stateStr,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

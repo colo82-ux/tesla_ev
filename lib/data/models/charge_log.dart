@@ -3,6 +3,7 @@ class ChargeLog {
   static const List<String> locationTypes = [
     '수퍼차저',
     '집밥(완속)',
+    '회사(완속)',
     '공용급속',
     '기타',
   ];

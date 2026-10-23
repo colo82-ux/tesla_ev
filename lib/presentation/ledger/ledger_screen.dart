@@ -355,12 +355,13 @@ class _ChargeTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSupercharger = charge.locationType == '수퍼차저';
-    final badgeColor = isSupercharger
-        ? TeslaColors.teslaRed
-        : (charge.locationType == '집밥(완속)'
-            ? TeslaColors.batteryGreen
-            : TeslaColors.electricBlue);
+    final badgeColor = switch (charge.locationType) {
+      '수퍼차저' => TeslaColors.teslaRed,
+      '집밥(완속)' => TeslaColors.batteryGreen,
+      '회사(완속)' => TeslaColors.electricBlue,
+      '공용급속' => TeslaColors.purpleAccent,
+      _ => TeslaColors.warningAmber,
+    };
 
     return Card(
       child: Padding(

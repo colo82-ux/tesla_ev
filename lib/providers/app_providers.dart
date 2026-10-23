@@ -29,6 +29,23 @@ class DailyEfficiencyPoint {
   });
 }
 
+/// 월별 지출 추이 데이터 포인트 (충전비 + 일반 유지비 스택 차트용)
+class MonthlyExpensePoint {
+  final int year;
+  final int month;
+  final int chargeCostKrw;
+  final int otherExpenseKrw;
+
+  const MonthlyExpensePoint({
+    required this.year,
+    required this.month,
+    required this.chargeCostKrw,
+    required this.otherExpenseKrw,
+  });
+
+  int get totalKrw => chargeCostKrw + otherExpenseKrw;
+}
+
 /// 앱 전역 상태 모델
 class TeslaAppState {
   final bool isLoading;
@@ -210,6 +227,46 @@ class TeslaAppState {
       distanceKm: totalDist,
       usedEnergyKwh: totalKwh,
     );
+  }
+
+  /// 최근 N개월(기본 6개월 또는 12개월) 월별 지출 추이 집계
+  List<MonthlyExpensePoint> getMonthlyExpenses({int months = 12}) {
+    final now = DateTime.now();
+    final List<MonthlyExpensePoint> result = [];
+
+    for (int i = months - 1; i >= 0; i--) {
+      final target = DateTime(now.year, now.month - i, 1);
+      final y = target.year;
+      final m = target.month;
+
+      final monthExpenses = expenses.where(
+        (e) => e.date.year == y && e.date.month == m,
+      );
+      final expenseChargeSum = monthExpenses
+          .where((e) => e.category == '충전비')
+          .fold<int>(0, (s, e) => s + e.amountKrw);
+      final otherExpenseSum = monthExpenses
+          .where((e) => e.category != '충전비')
+          .fold<int>(0, (s, e) => s + e.amountKrw);
+
+      final directChargeSum = charges
+          .where((c) => c.date.year == y && c.date.month == m)
+          .fold<int>(0, (s, c) => s + c.totalCostKrw);
+
+      final finalChargeCost =
+          expenseChargeSum > 0 ? expenseChargeSum : directChargeSum;
+
+      result.add(
+        MonthlyExpensePoint(
+          year: y,
+          month: m,
+          chargeCostKrw: finalChargeCost,
+          otherExpenseKrw: otherExpenseSum,
+        ),
+      );
+    }
+
+    return result;
   }
 }
 

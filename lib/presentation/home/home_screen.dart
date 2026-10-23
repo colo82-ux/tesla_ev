@@ -112,7 +112,7 @@ class HomeScreen extends ConsumerWidget {
                     _MonthlySummaryGrid(state: appState),
                     const SizedBox(height: 24),
 
-                    // 3. 하단: 최근 7일간 일별 전비 추이 꺾은선 차트 (fl_chart)
+                    // 3. 중단 2: 최근 7일간 일별 전비 추이 꺾은선 차트 (fl_chart)
                     const Text(
                       '최근 7일 일별 전비 추이 (km/kWh)',
                       style: TextStyle(
@@ -126,6 +126,10 @@ class HomeScreen extends ConsumerWidget {
                       points: appState.last7DaysEfficiency,
                       avgEfficiency: appState.monthlyAvgEfficiencyKmKwh,
                     ),
+                    const SizedBox(height: 24),
+
+                    // 4. 하단: 월별 차량 지출 차트 (최근 6개월 / 1년 선택 가능)
+                    _MonthlyExpenseSection(state: appState),
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -582,6 +586,282 @@ class _Last7DaysEfficiencyChartCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 대시보드 하단: 월별 지출 추이 차트 (최근 6개월 / 최근 1년 선택 가능)
+class _MonthlyExpenseSection extends StatefulWidget {
+  final TeslaAppState state;
+
+  const _MonthlyExpenseSection({required this.state});
+
+  @override
+  State<_MonthlyExpenseSection> createState() => _MonthlyExpenseSectionState();
+}
+
+class _MonthlyExpenseSectionState extends State<_MonthlyExpenseSection> {
+  int _selectedMonths = 6; // 기본 6개월, 12개월(1년) 토글 지원
+
+  @override
+  Widget build(BuildContext context) {
+    final points = widget.state.getMonthlyExpenses(months: _selectedMonths);
+    final totalPeriodKrw = points.fold<int>(0, (s, p) => s + p.totalKrw);
+    final avgMonthlyKrw =
+        points.isEmpty ? 0 : (totalPeriodKrw / points.length).round();
+
+    final maxTotal = points.fold<int>(
+      100000,
+      (prev, e) => e.totalKrw > prev ? e.totalKrw : prev,
+    );
+    // 차트 상단 여유 공간 확보 (만원 단위 올림)
+    final maxYManWon = ((maxTotal / 10000.0) * 1.25).ceilToDouble().clamp(10.0, 500.0);
+    final intervalManWon = (maxYManWon / 4.0).ceilToDouble().clamp(2.0, 100.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            const Text(
+              '월별 지출 추이 (충전비 + 유지비)',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: TeslaColors.textPrimary,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  label: const Text('최근 6개월', style: TextStyle(fontSize: 11)),
+                  selected: _selectedMonths == 6,
+                  onSelected: (_) => setState(() => _selectedMonths = 6),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  visualDensity: VisualDensity.compact,
+                  label: const Text('최근 1년', style: TextStyle(fontSize: 11)),
+                  selected: _selectedMonths == 12,
+                  onSelected: (_) => setState(() => _selectedMonths = 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _LegendDot(
+                          color: TeslaColors.batteryGreen,
+                          label: '충전비',
+                        ),
+                        const SizedBox(width: 12),
+                        _LegendDot(
+                          color: TeslaColors.warningAmber,
+                          label: '유지/기타(보험·세차·주차)',
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TeslaColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '월평균 ${UnitConverter.formatKrw(avgMonthlyKrw)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: TeslaColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 210,
+                  child: BarChart(
+                    BarChartData(
+                      maxY: maxYManWon,
+                      minY: 0,
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: intervalManWon,
+                        getDrawingHorizontalLine: (value) => const FlLine(
+                          color: TeslaColors.border,
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            interval: intervalManWon,
+                            getTitlesWidget: (val, meta) {
+                              return Text(
+                                '${val.toInt()}만',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: TeslaColors.textMuted,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 28,
+                            getTitlesWidget: (val, meta) {
+                              final idx = val.toInt();
+                              if (idx < 0 || idx >= points.length) {
+                                return const SizedBox.shrink();
+                              }
+                              final p = points[idx];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  '${p.month}월',
+                                  style: TextStyle(
+                                    fontSize: _selectedMonths == 12 ? 10 : 11,
+                                    color: TeslaColors.textSecondary,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            final p = points[group.x];
+                            return BarTooltipItem(
+                              '${p.year}년 ${p.month}월\n'
+                              '총 ${UnitConverter.formatKrw(p.totalKrw)}\n'
+                              '충전비: ${UnitConverter.formatKrw(p.chargeCostKrw)}\n'
+                              '유지비: ${UnitConverter.formatKrw(p.otherExpenseKrw)}',
+                              const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      barGroups: List.generate(points.length, (idx) {
+                        final p = points[idx];
+                        final chargeMan = p.chargeCostKrw / 10000.0;
+                        final totalMan = p.totalKrw / 10000.0;
+
+                        return BarChartGroupData(
+                          x: idx,
+                          barRods: [
+                            BarChartRodData(
+                              toY: totalMan,
+                              width: _selectedMonths == 12 ? 14 : 22,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(5),
+                              ),
+                              rodStackItems: [
+                                BarChartRodStackItem(
+                                  0,
+                                  chargeMan,
+                                  TeslaColors.batteryGreen,
+                                ),
+                                BarChartRodStackItem(
+                                  chargeMan,
+                                  totalMan,
+                                  TeslaColors.warningAmber,
+                                ),
+                              ],
+                              backDrawRodData: BackgroundBarChartRodData(
+                                show: true,
+                                toY: maxYManWon,
+                                color: TeslaColors.surfaceElevated,
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: TeslaColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }

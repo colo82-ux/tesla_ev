@@ -101,25 +101,32 @@ class SyncService {
         );
       }
 
-      // 차량 최신 스냅샷 갱신
+      // 차량 최신 스냅샷 갱신 (TeslaMate 실시간 /status 우선 반영)
+      final liveStatus = await client.fetchCarStatus();
       final prevSnapshot = await _storage.getVehicleSnapshot();
-      final addedKm = drives.fold<double>(0.0, (s, e) => s + e.distanceKm);
-      final latestSoc = charges.isNotEmpty
-          ? charges.first.endSoc
-          : (drives.isNotEmpty ? drives.first.endSoc : prevSnapshot.soc);
-
       final now = DateTime.now();
-      await _storage.saveVehicleSnapshot(
-        prevSnapshot.copyWith(
-          timestamp: now,
-          soc: latestSoc,
-          odometerKm: double.parse(
-            (prevSnapshot.odometerKm + addedKm).toStringAsFixed(1),
+
+      if (liveStatus != null) {
+        await _storage.saveVehicleSnapshot(liveStatus.copyWith(timestamp: now));
+      } else {
+        final addedKm = drives.fold<double>(0.0, (s, e) => s + e.distanceKm);
+        final latestSoc = charges.isNotEmpty
+            ? charges.first.endSoc
+            : (drives.isNotEmpty ? drives.first.endSoc : prevSnapshot.soc);
+
+        await _storage.saveVehicleSnapshot(
+          prevSnapshot.copyWith(
+            timestamp: now,
+            soc: latestSoc,
+            odometerKm: double.parse(
+              (prevSnapshot.odometerKm + addedKm).toStringAsFixed(1),
+            ),
+            estimatedRangeKm:
+                double.parse((latestSoc * 4.9).toStringAsFixed(1)),
+            vehicleState: 'online',
           ),
-          estimatedRangeKm: double.parse((latestSoc * 4.9).toStringAsFixed(1)),
-          vehicleState: 'online',
-        ),
-      );
+        );
+      }
       await _storage.setLastSyncTime(now);
 
       return SyncResult(

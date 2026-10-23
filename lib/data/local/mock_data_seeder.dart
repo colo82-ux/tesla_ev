@@ -183,6 +183,15 @@ class MockDataSeeder {
         endSoc: 88,
       ),
       ChargeLog(
+        date: now.subtract(const Duration(days: 8, hours: 4)),
+        locationType: '회사(완속)',
+        addedEnergyKwh: 29.0,
+        unitPriceKrw: 200,
+        totalCostKrw: (29.0 * 200).round(),
+        startSoc: 40,
+        endSoc: 78,
+      ),
+      ChargeLog(
         date: now.subtract(const Duration(days: 11, hours: 3)),
         locationType: '공용급속',
         addedEnergyKwh: 28.4,
@@ -334,6 +343,88 @@ class MockDataSeeder {
         DatabaseHelper.tableVampireDrainLogs,
         drain.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await seedHistoricalMonthlyDataIfNeeded(db);
+  }
+
+  /// 최근 12개월간의 월별 지출 차트(충전비 + 유지비)를 즉시 확인할 수 있도록 과거 월별 더미 데이터 추가
+  static Future<void> seedHistoricalMonthlyDataIfNeeded(
+    DatabaseExecutor db,
+  ) async {
+    final now = DateTime.now();
+
+    // 최근 1~11개월 전 월별 충전 및 일반 지출 샘플
+    final List<int> monthlyChargeCosts = [
+      0, // 당월은 위에서 이미 시딩됨
+      48500,
+      54200,
+      62800,
+      59400,
+      46200,
+      51000,
+      64500,
+      71200,
+      58900,
+      49800,
+      53400,
+    ];
+    final List<int> monthlyOtherCosts = [
+      0,
+      32000, // 세차/하이패스
+      95000, // 보험료 분납 + 주차
+      28000, // 하이패스/세차
+      64000, // 에어컨필터 DIY + 용품
+      35000, // 세차/주차
+      89000, // 보험료 + 통행료
+      41000, // 타이어 위치교환 + 세차
+      29000, // 하이패스
+      52000, // 와이퍼 교체 + 세차
+      31000, // 주차/통행료
+      89000, // 보험료
+    ];
+
+    for (int m = 1; m <= 11; m++) {
+      final targetDate = DateTime(now.year, now.month - m, 15, 14, 0);
+      final chargeCost = monthlyChargeCosts[m];
+      final otherCost = monthlyOtherCosts[m];
+      final addedKwh = double.parse((chargeCost / 250.0).toStringAsFixed(1));
+
+      await db.insert(
+        DatabaseHelper.tableChargeLogs,
+        ChargeLog(
+          date: targetDate,
+          locationType: m.isEven ? '집밥(완속)' : '회사(완속)',
+          addedEnergyKwh: addedKwh,
+          unitPriceKrw: m.isEven ? 250 : 200,
+          totalCostKrw: chargeCost,
+          startSoc: 25,
+          endSoc: 85,
+        ).toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+      await db.insert(
+        DatabaseHelper.tableExpenseLogs,
+        ExpenseLog(
+          date: targetDate,
+          category: '충전비',
+          amountKrw: chargeCost,
+          memo: '${targetDate.month}월 완속/수퍼차저 충전비 합산',
+        ).toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+      await db.insert(
+        DatabaseHelper.tableExpenseLogs,
+        ExpenseLog(
+          date: targetDate.add(const Duration(days: 3)),
+          category: m % 3 == 0 ? '보험료' : (m.isEven ? '세차/정비' : '하이패스/주차'),
+          amountKrw: otherCost,
+          memo: '${targetDate.month}월 차량 유지/관리 지출',
+        ).toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
       );
     }
   }
