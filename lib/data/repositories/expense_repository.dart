@@ -6,7 +6,7 @@ import '../models/expense_log.dart';
 class ExpenseRepository {
   final DatabaseHelper _dbHelper;
 
-  const ExpenseRepository({DatabaseHelper? dbHelper})
+  ExpenseRepository({DatabaseHelper? dbHelper})
       : _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   /// 전체 지출 내역 조회 (최신순)

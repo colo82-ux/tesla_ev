@@ -6,7 +6,7 @@ import '../models/maintenance_item.dart';
 class MaintenanceRepository {
   final DatabaseHelper _dbHelper;
 
-  const MaintenanceRepository({DatabaseHelper? dbHelper})
+  MaintenanceRepository({DatabaseHelper? dbHelper})
       : _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   /// 소모품 전체 목록 조회

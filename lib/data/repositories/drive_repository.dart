@@ -7,7 +7,7 @@ import '../models/vehicle_snapshot.dart';
 class DriveRepository {
   final DatabaseHelper _dbHelper;
 
-  const DriveRepository({DatabaseHelper? dbHelper})
+  DriveRepository({DatabaseHelper? dbHelper})
       : _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   /// 전체 주행 기록 조회 (최신순)

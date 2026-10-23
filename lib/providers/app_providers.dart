@@ -220,19 +220,19 @@ final secureStorageProvider = Provider<SecureStorageService>((ref) {
 });
 
 final driveRepositoryProvider = Provider<DriveRepository>((ref) {
-  return const DriveRepository();
+  return DriveRepository();
 });
 
 final chargeRepositoryProvider = Provider<ChargeRepository>((ref) {
-  return const ChargeRepository();
+  return ChargeRepository();
 });
 
 final expenseRepositoryProvider = Provider<ExpenseRepository>((ref) {
-  return const ExpenseRepository();
+  return ExpenseRepository();
 });
 
 final maintenanceRepositoryProvider = Provider<MaintenanceRepository>((ref) {
-  return const MaintenanceRepository();
+  return MaintenanceRepository();
 });
 
 final syncServiceProvider = Provider<SyncService>((ref) {

@@ -6,7 +6,7 @@ import '../models/charge_log.dart';
 class ChargeRepository {
   final DatabaseHelper _dbHelper;
 
-  const ChargeRepository({DatabaseHelper? dbHelper})
+  ChargeRepository({DatabaseHelper? dbHelper})
       : _dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   /// 전체 충전 기록 조회 (최신순)

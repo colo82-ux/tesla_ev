@@ -14,12 +14,12 @@ class _LedgerTimelineEntry {
   final ChargeLog? chargeLog;
   final ExpenseLog? expenseLog;
 
-  const _LedgerTimelineEntry.charge(ChargeLog log)
+  _LedgerTimelineEntry.charge(ChargeLog log)
       : date = log.date,
         chargeLog = log,
         expenseLog = null;
 
-  const _LedgerTimelineEntry.expense(ExpenseLog log)
+  _LedgerTimelineEntry.expense(ExpenseLog log)
       : date = log.date,
         chargeLog = null,
         expenseLog = log;
