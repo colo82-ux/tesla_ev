@@ -32,15 +32,21 @@ echo "=== [3/4] TeslaMate + TeslaMateAPI 폴더 및 보안 토큰 생성 ==="
 mkdir -p ~/teslamate/import
 cd ~/teslamate
 
-TM_ENCRYPTION_KEY=$(openssl rand -hex 24)
-TM_DB_PASS=$(openssl rand -hex 16)
-TM_API_TOKEN=$(openssl rand -hex 20)
+if [ -f .env ]; then
+  echo "기존 .env 보안 설정을 유지하고 DB 볼륨을 동기화합니다."
+  source .env
+  sudo docker compose down -v </dev/null || true
+else
+  TM_ENCRYPTION_KEY=$(openssl rand -hex 24)
+  TM_DB_PASS=$(openssl rand -hex 16)
+  TM_API_TOKEN=$(openssl rand -hex 20)
 
-cat <<EOF > .env
+  cat <<EOF > .env
 TM_ENCRYPTION_KEY=${TM_ENCRYPTION_KEY}
 TM_DB_PASS=${TM_DB_PASS}
 TM_API_TOKEN=${TM_API_TOKEN}
 EOF
+fi
 
 cat <<'EOF' > docker-compose.yml
 services:
@@ -87,6 +93,7 @@ services:
       - POSTGRES_USER=teslamate
       - POSTGRES_PASSWORD=${TM_DB_PASS}
       - POSTGRES_DB=teslamate
+      - POSTGRES_HOST_AUTH_METHOD=trust
     volumes:
       - teslamate-db:/var/lib/postgresql/data
 

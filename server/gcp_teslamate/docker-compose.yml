@@ -43,6 +43,7 @@ services:
       - POSTGRES_USER=teslamate
       - POSTGRES_PASSWORD=${TM_DB_PASS}
       - POSTGRES_DB=teslamate
+      - POSTGRES_HOST_AUTH_METHOD=trust
     volumes:
       - teslamate-db:/var/lib/postgresql/data
 
