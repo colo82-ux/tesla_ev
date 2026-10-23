@@ -62,7 +62,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('차계부 & 충전 타임라인'),
+        title: const Text('차계부 & 충전'),
         actions: [
           TextButton.icon(
             onPressed: () =>
@@ -82,7 +82,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ResponsiveLayout.constrainMaxWidth(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
                   // 1. 상단 요약 및 충전 단가 프리셋 배너
                   Card(
@@ -105,17 +105,22 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      UnitConverter.formatKrw(totalExpenseKrw),
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800,
-                                        color: TeslaColors.textPrimary,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        UnitConverter.formatKrw(totalExpenseKrw),
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          color: TeslaColors.textPrimary,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,12 +133,16 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      '${UnitConverter.formatDecimal1(totalChargeEnergyKwh)} kWh',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800,
-                                        color: TeslaColors.batteryGreen,
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '${UnitConverter.formatDecimal1(totalChargeEnergyKwh)} kWh',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          color: TeslaColors.batteryGreen,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -155,6 +164,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                             runSpacing: 8,
                             children: appState.chargePresets.map((preset) {
                               return ActionChip(
+                                visualDensity: VisualDensity.compact,
                                 avatar: const Icon(
                                   Icons.bolt_rounded,
                                   size: 16,
@@ -178,7 +188,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // 2. 필터 칩 및 통합 타임라인 헤더
+                  // 2. 통합 타임라인 헤더 및 필터 칩 (좁은 화면에서도 절대 잘리지 않도록 2단 배치)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -190,23 +200,32 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                           color: TeslaColors.textPrimary,
                         ),
                       ),
-                      Wrap(
-                        spacing: 6,
-                        children: ['전체', '충전 기록', '일반 지출'].map((filter) {
-                          final selected = _selectedFilter == filter;
-                          return ChoiceChip(
-                            label: Text(
-                              filter,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            selected: selected,
-                            onSelected: (_) {
-                              setState(() => _selectedFilter = filter);
-                            },
-                          );
-                        }).toList(),
+                      Text(
+                        '총 ${entries.length}건',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: TeslaColors.textSecondary,
+                        ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ['전체', '충전 기록', '일반 지출'].map((filter) {
+                      final selected = _selectedFilter == filter;
+                      return ChoiceChip(
+                        label: Text(
+                          filter,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _selectedFilter = filter);
+                        },
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 12),
 
@@ -347,6 +366,7 @@ class _ChargeTimelineCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 44,
@@ -360,60 +380,74 @@ class _ChargeTimelineCard extends StatelessWidget {
                 color: badgeColor,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        '[충전] ${charge.locationType}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: TeslaColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '+${charge.addedEnergyKwh} kWh (${charge.startSoc}%→${charge.endSoc}%)',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: TeslaColors.batteryGreen,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
                   Text(
-                    '단가 ${charge.unitPriceKrw}원/kWh · ${UnitConverter.formatDateTime(charge.date)}',
+                    '[충전] ${charge.locationType}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: TeslaColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '+${charge.addedEnergyKwh} kWh (${charge.startSoc}% → ${charge.endSoc}%) · 단가 ${charge.unitPriceKrw}원',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: TeslaColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      color: TeslaColors.batteryGreen,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    UnitConverter.formatDateTime(charge.date),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: TeslaColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-            Text(
-              UnitConverter.formatKrw(charge.totalCostKrw),
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: TeslaColors.textPrimary,
-              ),
-            ),
-            if (onDelete != null)
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: TeslaColors.textMuted,
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  UnitConverter.formatKrw(charge.totalCostKrw),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: TeslaColors.textPrimary,
+                  ),
                 ),
-                onPressed: onDelete,
-              ),
+                if (onDelete != null) ...[
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: TeslaColors.textMuted,
+                      ),
+                      onPressed: onDelete,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -436,6 +470,7 @@ class _ExpenseTimelineCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 44,
@@ -449,7 +484,7 @@ class _ExpenseTimelineCard extends StatelessWidget {
                 color: TeslaColors.warningAmber,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,35 +496,51 @@ class _ExpenseTimelineCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: TeslaColors.textPrimary,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     UnitConverter.formatDateTime(expense.date),
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: TeslaColors.textSecondary,
+                      fontSize: 11,
+                      color: TeslaColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-            Text(
-              UnitConverter.formatKrw(expense.amountKrw),
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: TeslaColors.warningAmber,
-              ),
-            ),
-            if (onDelete != null)
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: TeslaColors.textMuted,
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  UnitConverter.formatKrw(expense.amountKrw),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: TeslaColors.warningAmber,
+                  ),
                 ),
-                onPressed: onDelete,
-              ),
+                if (onDelete != null) ...[
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: TeslaColors.textMuted,
+                      ),
+                      onPressed: onDelete,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -590,24 +641,23 @@ class _QuickEntryBottomSheetState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '차계부 & 충전 빠른 입력',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, label: Text('충전 기록')),
-                    ButtonSegment(value: false, label: Text('일반 지출')),
-                  ],
-                  selected: {_isChargeMode},
-                  onSelectionChanged: (s) {
-                    setState(() => _isChargeMode = s.first);
-                  },
-                ),
-              ],
+            const Text(
+              '차계부 & 충전 빠른 입력',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('충전 기록')),
+                  ButtonSegment(value: false, label: Text('일반 지출')),
+                ],
+                selected: {_isChargeMode},
+                onSelectionChanged: (s) {
+                  setState(() => _isChargeMode = s.first);
+                },
+              ),
             ),
             const SizedBox(height: 16),
             if (_isChargeMode) ...[

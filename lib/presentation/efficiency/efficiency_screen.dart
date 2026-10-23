@@ -415,22 +415,24 @@ class _VampireDrainStatsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _DrainMiniStat(
-                    label: '누적 대기 손실 전력',
+                    label: '누적 손실 전력',
                     value: '${UnitConverter.formatDecimal2(totalLostKwh)} kWh',
                     color: TeslaColors.warningAmber,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _DrainMiniStat(
-                    label: '누적 감소 주행가능거리',
+                    label: '감소 주행거리',
                     value:
                         '-${UnitConverter.formatDecimal1(totalLostRangeKm)} km',
                     color: TeslaColors.teslaRed,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _DrainMiniStat(
-                    label: '24시간 환산 평균 손실',
+                    label: '일평균 손실률',
                     value:
                         '-${UnitConverter.formatDecimal1(avgDailySocDrain)}% /일',
                     color: TeslaColors.purpleAccent,
@@ -447,41 +449,76 @@ class _VampireDrainStatsCard extends StatelessWidget {
                 color: TeslaColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             ...drains.take(3).map((d) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+              final modeColor = d.sentryModeActive
+                  ? TeslaColors.teslaRed
+                  : TeslaColors.batteryGreen;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: TeslaColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
+                    Icon(
+                      d.sentryModeActive
+                          ? Icons.visibility_rounded
+                          : Icons.bedtime_rounded,
+                      size: 18,
+                      color: modeColor,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${UnitConverter.formatShortDate(d.startTime)} · ${d.parkedHours.toStringAsFixed(1)}시간 주차',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: TeslaColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            d.sentryModeActive ? '감시모드 ON' : '딥슬립 (절전)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: modeColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Icon(
-                          d.sentryModeActive
-                              ? Icons.visibility_rounded
-                              : Icons.bedtime_rounded,
-                          size: 16,
-                          color: d.sentryModeActive
-                              ? TeslaColors.teslaRed
-                              : TeslaColors.batteryGreen,
-                        ),
-                        const SizedBox(width: 8),
                         Text(
-                          '${UnitConverter.formatShortDate(d.startTime)} (${d.parkedHours.toStringAsFixed(1)}시간 주차 · ${d.sentryModeActive ? "감시모드 ON" : "딥슬립"})',
+                          '${d.startSoc}% → ${d.endSoc}%',
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: TeslaColors.textPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: TeslaColors.warningAmber,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '-${d.lostEnergyKwh} kWh',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: TeslaColors.textSecondary,
                           ),
                         ),
                       ],
-                    ),
-                    Text(
-                      '${d.startSoc}%→${d.endSoc}% (-${d.lostEnergyKwh}kWh)',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: TeslaColors.warningAmber,
-                      ),
                     ),
                   ],
                 ),
@@ -507,23 +544,39 @@ class _DrainMiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: TeslaColors.textMuted),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: color,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: TeslaColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: TeslaColors.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -549,10 +602,11 @@ class _DriveTripCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 58,
-              height: 58,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: effColor.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(12),
@@ -563,7 +617,7 @@ class _DriveTripCard extends StatelessWidget {
                   Text(
                     drive.efficiencyKmKwh.toStringAsFixed(2),
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: effColor,
                     ),
@@ -578,12 +632,15 @@ class _DriveTripCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         '${UnitConverter.formatDecimal1(drive.distanceKm)} km 주행',
@@ -593,7 +650,6 @@ class _DriveTripCard extends StatelessWidget {
                           color: TeslaColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 6,
@@ -615,32 +671,41 @@ class _DriveTripCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '소모 ${drive.usedEnergyKwh}kWh · 배터리 ${drive.startSoc}% → ${drive.endSoc}% · 외기 ${drive.outsideTempAvg}°C',
+                    '소모 ${drive.usedEnergyKwh}kWh · SoC ${drive.startSoc}%→${drive.endSoc}% · ${drive.outsideTempAvg}°C',
                     style: const TextStyle(
                       fontSize: 12,
                       color: TeslaColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${UnitConverter.formatDateTime(drive.startTime)} (${drive.duration.inMinutes}분 소요)',
+                    '${UnitConverter.formatDateTime(drive.startTime)} (${drive.duration.inMinutes}분)',
                     style: const TextStyle(
                       fontSize: 11,
                       color: TeslaColors.textMuted,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             if (onDelete != null)
-              IconButton(
-                tooltip: '삭제',
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: TeslaColors.textMuted,
+              SizedBox(
+                width: 32,
+                height: 32,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: '삭제',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: TeslaColors.textMuted,
+                  ),
+                  onPressed: onDelete,
                 ),
-                onPressed: onDelete,
               ),
           ],
         ),

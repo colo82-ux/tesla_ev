@@ -78,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('소모품 관리 & 데이터 연동 설정'),
+        title: const Text('소모품 & 연동 설정'),
       ),
       body: appState.isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -167,23 +167,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          SegmentedButton<SyncMode>(
-                            segments: const [
-                              ButtonSegment(
-                                value: SyncMode.teslamate,
-                                icon: Icon(Icons.dns_rounded, size: 18),
-                                label: Text('모드 A: TeslaMate API'),
-                              ),
-                              ButtonSegment(
-                                value: SyncMode.directFleet,
-                                icon: Icon(Icons.cloud_sync_rounded, size: 18),
-                                label: Text('모드 B: Tesla Fleet API'),
-                              ),
-                            ],
-                            selected: {appState.activeSyncMode},
-                            onSelectionChanged: (s) {
-                              notifier.setSyncMode(s.first);
-                            },
+                          SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<SyncMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: SyncMode.teslamate,
+                                  icon: Icon(Icons.dns_rounded, size: 16),
+                                  label: Text(
+                                    'TeslaMate API',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                ButtonSegment(
+                                  value: SyncMode.directFleet,
+                                  icon:
+                                      Icon(Icons.cloud_sync_rounded, size: 16),
+                                  label: Text(
+                                    'Tesla Fleet API',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                              selected: {appState.activeSyncMode},
+                              onSelectionChanged: (s) {
+                                notifier.setSyncMode(s.first);
+                              },
+                            ),
                           ),
                           const Divider(height: 28),
 

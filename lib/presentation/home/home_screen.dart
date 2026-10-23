@@ -30,19 +30,23 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(width: 8),
             const Text('테슬라_ev'),
             const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: TeslaColors.surfaceElevated,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: TeslaColors.border),
-              ),
-              child: Text(
-                appState.activeSyncMode.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: TeslaColors.textSecondary,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: TeslaColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: TeslaColors.border),
+                ),
+                child: Text(
+                  appState.activeSyncMode.label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: TeslaColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -369,13 +373,17 @@ class _MonthlySummaryGrid extends StatelessWidget {
                     Icon(item.icon, color: item.accentColor, size: 18),
                   ],
                 ),
-                Text(
-                  item.value,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: TeslaColors.textPrimary,
-                    letterSpacing: -0.4,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    item.value,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: TeslaColors.textPrimary,
+                      letterSpacing: -0.4,
+                    ),
                   ),
                 ),
                 Text(
