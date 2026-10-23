@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# [테슬라_ev] 구글 클라우드(GCP e2-micro Ubuntu) 원클릭 자동 구축 스크립트
-# - 1단계: 2GB 가상 메모리(Swap) 자동 생성 (e2-micro 1GB 램 뻗음 방지)
-# - 2단계: Docker 및 Docker Compose 설치
-# - 3단계: 보안 키 및 스마트폰 앱 연동용 Bearer Token 자동 생성
-# - 4단계: TeslaMate + PostgreSQL + Grafana + TeslaMateAPI(8080포트) 실행
+# [테슬라_ev] 구글 클라우드(GCP e2-micro Ubuntu/Debian) 원클릭 자동 구축 스크립트
 # ==============================================================================
 set -e
 
 echo "=== [1/4] 가상 메모리(Swap 2GB) 확인 및 설정 ==="
 if [ ! -f /swapfile ]; then
-  sudo fallocate -l 2G /swapfile
-  sudo chmod 600 /swapfile
-  sudo mkswap /swapfile
-  sudo swapon /swapfile
-  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  sudo fallocate -l 2G /swapfile </dev/null
+  sudo chmod 600 /swapfile </dev/null
+  sudo mkswap /swapfile </dev/null
+  sudo swapon /swapfile </dev/null
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab </dev/null
   echo "Swap 2GB 생성 완료!"
 else
   echo "Swap 파일이 이미 존재합니다."
@@ -22,10 +18,11 @@ fi
 
 echo "=== [2/4] Docker 설치 확인 ==="
 if ! command -v docker &> /dev/null; then
-  sudo apt-get update
-  sudo apt-get install -y ca-certificates curl gnupg openssl
-  curl -fsSL https://get.docker.com | sudo sh
-  sudo usermod -aG docker "$USER" || true
+  sudo apt-get update </dev/null
+  sudo apt-get install -y ca-certificates curl gnupg openssl </dev/null
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  sudo sh /tmp/get-docker.sh </dev/null
+  sudo usermod -aG docker "$USER" </dev/null || true
   echo "Docker 설치 완료!"
 else
   echo "Docker가 이미 설치되어 있습니다."
@@ -121,10 +118,14 @@ volumes:
   mosquitto-data:
 EOF
 
-echo "=== [4/4] 컨테이너 실행 중... ==="
-sudo docker compose up -d
+echo "=== [4/4] TeslaMate 컨테이너 다운로드 및 실행 중... ==="
+sudo docker compose up -d </dev/null
 
-EXTERNAL_IP=$(curl -s ifconfig.me || echo "<구글클라우드_외부_IP>")
+echo "컨테이너 초기화 대기 중 (10초)..."
+sleep 10
+sudo docker compose ps </dev/null
+
+EXTERNAL_IP=$(curl -s ifconfig.me || echo "34.11.135.61")
 
 echo ""
 echo "=================================================================="
@@ -136,7 +137,7 @@ echo ""
 echo "2. Grafana 대시보드 웹페이지 (초기 ID/PW: admin / admin):"
 echo "   http://${EXTERNAL_IP}:3000"
 echo ""
-echo "3. 스마트폰 [테슬라_ev] 앱 -> [소모품&설정] -> [모드 A]에 입력할 값:"
+echo "3. 스마트폰 [테슬라_ev] 앱 -> [소모품&설정] -> [TeslaMate API]에 입력할 값:"
 echo "   - TeslaMate Base URL     : http://${EXTERNAL_IP}:8080"
 echo "   - TeslaMate Bearer Token : ${TM_API_TOKEN}"
 echo "   - Car ID                 : 1"
