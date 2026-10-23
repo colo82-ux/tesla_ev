@@ -48,14 +48,16 @@ class TeslaMateApiClient {
 
       final distanceKm =
           ((map['distance'] ?? map['distance_km'] ?? 0.0) as num).toDouble();
-      final usedEnergyKwh = ((map['consumption_kwh'] ??
+      final usedEnergyKwh = ((map['energy_consumed_net'] ??
+                  map['consumption_kwh'] ??
                   map['used_energy_kwh'] ??
                   0.0) as num)
               .toDouble();
 
-      // TeslaMate가 제공하는 consumption_kwh_per_100km 또는 wh_per_km 필드가 있으면
+      // TeslaMateAPI의 consumption_net(Wh/km) 또는 wh_per_km 필드가 있으면
       // Wh/km -> km/kWh 변환 헬퍼를 사용하고, 없으면 주행거리/소모전력으로 계산
-      final whPerKm = ((map['wh_per_km'] ??
+      final whPerKm = ((map['consumption_net'] ??
+                  map['wh_per_km'] ??
                   map['efficiency_wh_km'] ??
                   (distanceKm > 0 ? (usedEnergyKwh * 1000.0) / distanceKm : 0.0))
               as num)
@@ -71,12 +73,18 @@ class TeslaMateApiClient {
       final outsideTempAvg =
           ((map['outside_temp_avg'] ?? map['outside_temp'] ?? 18.0) as num)
               .toDouble();
-      final startSoc = ((map['start_battery_level'] ??
+      final batteryDetails =
+          map['battery_details'] as Map<String, dynamic>? ?? const {};
+      final startSoc = ((batteryDetails['start_battery_level'] ??
+                  map['start_battery_level'] ??
                   map['start_soc'] ??
                   80) as num)
               .toInt();
-      final endSoc =
-          ((map['end_battery_level'] ?? map['end_soc'] ?? 70) as num).toInt();
+      final endSoc = ((batteryDetails['end_battery_level'] ??
+                  map['end_battery_level'] ??
+                  map['end_soc'] ??
+                  70) as num)
+              .toInt();
 
       if (distanceKm > 0.1) {
         results.add(
@@ -164,12 +172,18 @@ class TeslaMateApiClient {
                   (addedEnergyKwh * unitPriceKrw)) as num)
               .round();
 
-      final startSoc = ((map['start_battery_level'] ??
+      final batteryDetails =
+          map['battery_details'] as Map<String, dynamic>? ?? const {};
+      final startSoc = ((batteryDetails['start_battery_level'] ??
+                  map['start_battery_level'] ??
                   map['start_soc'] ??
                   30) as num)
               .toInt();
-      final endSoc =
-          ((map['end_battery_level'] ?? map['end_soc'] ?? 80) as num).toInt();
+      final endSoc = ((batteryDetails['end_battery_level'] ??
+                  map['end_battery_level'] ??
+                  map['end_soc'] ??
+                  80) as num)
+              .toInt();
 
       results.add(
         ChargeLog(
