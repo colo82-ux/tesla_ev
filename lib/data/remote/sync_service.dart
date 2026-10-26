@@ -67,9 +67,12 @@ class SyncService {
     final lastSync = await _storage.getLastSyncTime();
     final presets = await _storage.getChargePresets();
 
-    // API 토큰이 아직 입력되지 않은 경우 오프라인 데모 트립 1건을 시뮬레이션 동기화
-    if (token.isEmpty) {
-      return _simulateDemoSync(SyncMode.teslamate);
+    // 서버 URL이 설정되어 있지 않은 경우에만 오프라인 데모 시뮬레이션 동기화 실행
+    if (baseUrl.trim().isEmpty) {
+      return _simulateDemoSync(
+        SyncMode.teslamate,
+        fallbackReason: 'TeslaMate 서버 URL 미설정',
+      );
     }
 
     try {
@@ -79,9 +82,13 @@ class SyncService {
         carId: carId,
       );
 
-      final drives = await client.fetchDrives(since: lastSync);
+      // 로컬 DB가 비어있는 경우 과거 전체 주행/충전 기록을 모두 수신하도록 since를 null로 처리
+      final localDrives = await _driveRepository.getAllDrives();
+      final sinceParam = localDrives.isEmpty ? null : lastSync;
+
+      final drives = await client.fetchDrives(since: sinceParam);
       final charges = await client.fetchCharges(
-        since: lastSync,
+        since: sinceParam,
         presets: presets,
       );
 
@@ -101,7 +108,7 @@ class SyncService {
         );
       }
 
-      // 차량 최신 스냅샷 갱신 (TeslaMate 실시간 /status 및 :4000 웹 상태 우선 반영)
+      // 차량 최신 스냅샷 갱신 (1차 실시간 /status, 2차 :4000 웹 대시보드, 3차 최신 주행 /drives 우선 반영)
       final liveStatus = await client.fetchCarStatus();
       final prevSnapshot = await _storage.getVehicleSnapshot();
       final now = DateTime.now();
@@ -110,20 +117,19 @@ class SyncService {
       if (liveStatus != null) {
         finalSnapshot = liveStatus.copyWith(timestamp: now);
       } else {
-        final addedKm = drives.fold<double>(0.0, (s, e) => s + e.distanceKm);
+        final latestDrive = drives.isNotEmpty
+            ? drives.reduce((a, b) => a.endTime.isAfter(b.endTime) ? a : b)
+            : null;
         final latestSoc = charges.isNotEmpty
             ? charges.first.endSoc
-            : (drives.isNotEmpty ? drives.first.endSoc : prevSnapshot.soc);
+            : (latestDrive != null ? latestDrive.endSoc : prevSnapshot.soc);
 
         finalSnapshot = prevSnapshot.copyWith(
           timestamp: now,
           soc: latestSoc,
-          odometerKm: double.parse(
-            (prevSnapshot.odometerKm + addedKm).toStringAsFixed(1),
-          ),
           estimatedRangeKm:
               double.parse((latestSoc * 4.27).toStringAsFixed(1)),
-          vehicleState: 'online',
+          vehicleState: 'offline',
         );
       }
       await _storage.saveVehicleSnapshot(finalSnapshot);

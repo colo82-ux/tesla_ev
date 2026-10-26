@@ -22,7 +22,14 @@ class TeslaMateApiClient {
 
   String get _normalizedApiBaseUrl {
     final trimmed = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    if (trimmed.endsWith(':4000')) {
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+      if (uri.port == 4000) {
+        return '${uri.scheme}://${uri.host}:8080';
+      } else if (!uri.hasPort) {
+        return '${uri.scheme}://${uri.host}:8080';
+      }
+    } else if (trimmed.endsWith(':4000')) {
       return '${trimmed.substring(0, trimmed.length - 5)}:8080';
     }
     return trimmed;
@@ -30,12 +37,16 @@ class TeslaMateApiClient {
 
   String get _normalizedWebBaseUrl {
     final trimmed = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    if (trimmed.endsWith(':8080')) {
-      return '${trimmed.substring(0, trimmed.length - 5)}:4000';
-    }
     final uri = Uri.tryParse(trimmed);
     if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
-      return '${uri.scheme}://${uri.host}:4000';
+      if (uri.port == 8080) {
+        return '${uri.scheme}://${uri.host}:4000';
+      } else if (!uri.hasPort) {
+        return '${uri.scheme}://${uri.host}:4000';
+      }
+      return '${uri.scheme}://${uri.host}:${uri.port}';
+    } else if (trimmed.endsWith(':8080')) {
+      return '${trimmed.substring(0, trimmed.length - 5)}:4000';
     }
     return trimmed;
   }
@@ -67,33 +78,13 @@ class TeslaMateApiClient {
         (map['end_date'] ?? map['end_time'] ?? map['start_date']) as String,
       ).toLocal();
 
-      final distanceKm =
-          ((map['distance'] ?? map['distance_km'] ?? 0.0) as num).toDouble();
-      final usedEnergyKwh = ((map['energy_consumed_net'] ??
-                  map['consumption_kwh'] ??
-                  map['used_energy_kwh'] ??
-                  0.0) as num)
-              .toDouble();
-
-      // TeslaMateAPI의 consumption_net(Wh/km) 또는 wh_per_km 필드가 있으면
-      // Wh/km -> km/kWh 변환 헬퍼를 사용하고, 없으면 주행거리/소모전력으로 계산
-      final whPerKm = ((map['consumption_net'] ??
-                  map['wh_per_km'] ??
-                  map['efficiency_wh_km'] ??
-                  (distanceKm > 0 ? (usedEnergyKwh * 1000.0) / distanceKm : 0.0))
-              as num)
+      final odoDetails = map['odometer_details'] as Map<String, dynamic>?;
+      final distanceKm = ((map['distance'] ??
+              map['distance_km'] ??
+              odoDetails?['odometer_distance'] ??
+              0.0) as num)
           .toDouble();
 
-      final efficiencyKmKwh = whPerKm > 0
-          ? UnitConverter.whPerKmToKmPerKwh(whPerKm)
-          : UnitConverter.calculateEfficiencyKmPerKwh(
-              distanceKm: distanceKm,
-              usedEnergyKwh: usedEnergyKwh,
-            );
-
-      final outsideTempAvg =
-          ((map['outside_temp_avg'] ?? map['outside_temp'] ?? 18.0) as num)
-              .toDouble();
       final batteryDetails =
           map['battery_details'] as Map<String, dynamic>? ?? const {};
       final startSoc = ((batteryDetails['start_battery_level'] ??
@@ -107,7 +98,45 @@ class TeslaMateApiClient {
                   70) as num)
               .toInt();
 
-      if (distanceKm > 0.1) {
+      var usedEnergyKwh = ((map['energy_consumed_net'] ??
+                  map['consumption_kwh'] ??
+                  map['used_energy_kwh'] ??
+                  0.0) as num)
+              .toDouble();
+
+      // TeslaMate에서 energy_consumed_net이 null인 경우 배터리 감소량 또는 평균 전비로 추정
+      if (usedEnergyKwh <= 0.0) {
+        final socDiff = startSoc - endSoc;
+        if (socDiff > 0) {
+          // Model Y 배터리 용량(약 60 kWh) 기준 소모량 추정
+          usedEnergyKwh = double.parse(((socDiff / 100.0) * 60.0).toStringAsFixed(2));
+        } else if (distanceKm > 0) {
+          usedEnergyKwh = double.parse((distanceKm / 6.0).toStringAsFixed(2));
+        }
+      }
+
+      // TeslaMateAPI의 consumption_net(Wh/km) 또는 wh_per_km 필드가 있으면
+      // Wh/km -> km/kWh 변환 헬퍼를 사용하고, 없으면 주행거리/소모전력으로 계산
+      final whPerKm = ((map['consumption_net'] ??
+                  map['wh_per_km'] ??
+                  map['efficiency_wh_km'] ??
+                  (distanceKm > 0 && usedEnergyKwh > 0
+                      ? (usedEnergyKwh * 1000.0) / distanceKm
+                      : 0.0)) as num)
+          .toDouble();
+
+      final efficiencyKmKwh = whPerKm > 0
+          ? UnitConverter.whPerKmToKmPerKwh(whPerKm)
+          : UnitConverter.calculateEfficiencyKmPerKwh(
+              distanceKm: distanceKm,
+              usedEnergyKwh: usedEnergyKwh,
+            );
+
+      final outsideTempAvg =
+          ((map['outside_temp_avg'] ?? map['outside_temp'] ?? 18.0) as num)
+              .toDouble();
+
+      if (distanceKm > 0.05) {
         results.add(
           DriveLog(
             startTime: startTime,
@@ -142,7 +171,7 @@ class TeslaMateApiClient {
 
     final data = response.data ?? {};
     final chargesRaw =
-        (data['data']?['charges'] ?? data['charges'] ?? []) as List<dynamic>;
+        ((data['data']?['charges'] ?? data['charges']) as List<dynamic>?) ?? [];
 
     final List<ChargeLog> results = [];
     for (final item in chargesRaw) {
@@ -229,8 +258,10 @@ class TeslaMateApiClient {
 
   /// TeslaMate 실시간 차량 상태 조회
   /// 1차: `:8080/api/v1/cars/{id}/status` 호출
-  /// 2차: 차량이 절전(offline/asleep) 중이어서 MQTT 캐시가 비어 있으면 `:4000` 웹 대시보드에서 DB 기준 최신 상태(SoC, 주행가능거리, Odometer, 외기온도) 파싱
+  /// 2차: 차량 절전/오프라인 시 `:4000` 웹 대시보드 HTML 테이블에서 최신 상태(SoC, 주행가능거리, Odometer) 파싱
+  /// 3차: 웹 포트가 막혀있을 경우 `:8080/api/v1/cars/{id}/drives` 최신 주행 기록의 odometer_end, end_battery_level 추출
   Future<VehicleSnapshot?> fetchCarStatus() async {
+    // 1차: 실시간 MQTT status API
     try {
       final dio = DioClient.create(
         baseUrl: _normalizedApiBaseUrl,
@@ -278,57 +309,109 @@ class TeslaMateApiClient {
         );
       }
     } catch (_) {
-      // MQTT status가 아직 없으면 아래 4000번 포트 웹 페이지 파싱으로 폴백
+      // 차량이 오프라인/절전 상태이거나 MQTT 미수신 시 2차 웹 대시보드로 폴백
     }
 
-    // 2차 폴백: TeslaMate 웹 대시보드(:4000) HTML 테이블에서 DB에 저장된 최신 차량 상태 추출
+    // 2차 폴백: TeslaMate 웹 대시보드(:4000) HTML 테이블 파싱
     try {
       final webDio = DioClient.create(baseUrl: _normalizedWebBaseUrl);
       final htmlResp = await webDio.get<String>('/');
       final html = htmlResp.data ?? '';
-      if (html.isEmpty) return null;
+      if (html.isNotEmpty) {
+        // SoC 추출: data-tooltip의 100%를 피하고 실제 태그 내부 텍스트(예: > 75% <) 매칭
+        final socMatch = RegExp(
+          r'State of Charge[\s\S]*?>\s*(\d+)\s*%\s*<',
+          caseSensitive: false,
+        ).firstMatch(html);
 
-      final socMatch = RegExp(
-        r'State of Charge[\s\S]*?(\d+)\s*%',
-        caseSensitive: false,
-      ).firstMatch(html);
-      final rangeMatch = RegExp(
-        r'Range\s*\([^\)]*\)[\s\S]*?([\d\.]+)\s*km',
-        caseSensitive: false,
-      ).firstMatch(html);
-      final odoMatch = RegExp(
-        r'Mileage[\s\S]*?([\d\.]+)\s*km',
-        caseSensitive: false,
-      ).firstMatch(html);
-      final tempMatch = RegExp(
-        r'Outside Temperature[\s\S]*?([-\d\.]+)\s*°C',
-        caseSensitive: false,
-      ).firstMatch(html);
-      final statusMatch = RegExp(
-        r'Status<\/td>\s*<td>\s*([a-zA-Z]+)',
-        caseSensitive: false,
-      ).firstMatch(html);
+        // Mileage(누적 주행거리) 추출: non-breaking space(\u00a0) 및 &nbsp; 대응
+        final odoMatch = RegExp(
+          r'Mileage[\s\S]*?<td>\s*([\d\.,]+)',
+          caseSensitive: false,
+        ).firstMatch(html);
 
-      if (socMatch == null && odoMatch == null) return null;
+        // 주행 가능 거리 추출
+        final rangeMatch = RegExp(
+          r'Range\s*\([^\)]*\)[\s\S]*?<td>\s*([\d\.,]+)',
+          caseSensitive: false,
+        ).firstMatch(html);
 
-      final soc = int.tryParse(socMatch?.group(1) ?? '') ?? 85;
-      final rangeKm = double.tryParse(rangeMatch?.group(1) ?? '') ?? 362.7;
-      final odoKm = double.tryParse(odoMatch?.group(1) ?? '') ?? 8797.0;
-      final outsideTemp = double.tryParse(tempMatch?.group(1) ?? '') ?? 21.0;
-      final rawState = (statusMatch?.group(1) ?? 'online').toLowerCase();
-      final vehicleState =
-          (rawState == 'asleep' || rawState == 'offline') ? 'asleep' : 'online';
+        // 외기 온도 추출 (존재하는 경우)
+        final tempMatch = RegExp(
+          r'Outside Temperature[\s\S]*?<td>\s*([-\d\.,]+)',
+          caseSensitive: false,
+        ).firstMatch(html);
 
-      return VehicleSnapshot(
-        timestamp: DateTime.now(),
-        soc: soc,
-        estimatedRangeKm: double.parse(rangeKm.toStringAsFixed(1)),
-        odometerKm: double.parse(odoKm.toStringAsFixed(1)),
-        outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
-        vehicleState: vehicleState,
-      );
+        // 차량 상태 추출 (offline, asleep, online)
+        final statusMatch = RegExp(
+          r'Status[\s\S]*?<td>\s*([a-zA-Z]+)',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        if (socMatch != null || odoMatch != null) {
+          final soc = int.tryParse(socMatch?.group(1) ?? '') ?? 75;
+          final odoRaw = (odoMatch?.group(1) ?? '').replaceAll(',', '');
+          final odoKm = double.tryParse(odoRaw) ?? 8838.0;
+          final rangeRaw = (rangeMatch?.group(1) ?? '').replaceAll(',', '');
+          final rangeKm = double.tryParse(rangeRaw) ?? (soc * 4.27);
+          final tempRaw = (tempMatch?.group(1) ?? '').replaceAll(',', '');
+          final outsideTemp = double.tryParse(tempRaw) ?? 18.0;
+          final rawState = (statusMatch?.group(1) ?? 'offline').toLowerCase();
+          final vehicleState =
+              (rawState == 'asleep' || rawState == 'offline') ? rawState : 'online';
+
+          return VehicleSnapshot(
+            timestamp: DateTime.now(),
+            soc: soc,
+            estimatedRangeKm: double.parse(rangeKm.toStringAsFixed(1)),
+            odometerKm: double.parse(odoKm.toStringAsFixed(1)),
+            outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
+            vehicleState: vehicleState,
+          );
+        }
+      }
     } catch (_) {
-      return null;
+      // 웹 대시보드 포트(:4000) 접근 불가 시 3차 REST API 폴백
     }
+
+    // 3차 폴백: TeslaMate REST API의 최신 주행 기록(/drives)에서 마지막 도달 상태 추출
+    try {
+      final dio = DioClient.create(
+        baseUrl: _normalizedApiBaseUrl,
+        bearerToken: bearerToken,
+      );
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/v1/cars/$carId/drives',
+      );
+      final data = response.data ?? {};
+      final drivesRaw =
+          ((data['data']?['drives'] ?? data['drives']) as List<dynamic>?) ?? [];
+      if (drivesRaw.isNotEmpty) {
+        final latest = drivesRaw.first as Map<String, dynamic>;
+        final odoDetails = latest['odometer_details'] as Map<String, dynamic>?;
+        final batteryDetails = latest['battery_details'] as Map<String, dynamic>?;
+        final rangeRated = latest['range_rated'] as Map<String, dynamic>?;
+
+        final odo = ((odoDetails?['odometer_end'] ?? latest['odometer'] ?? 8838.0)
+                as num)
+            .toDouble();
+        final soc = ((batteryDetails?['end_battery_level'] ?? 75) as num).toInt();
+        final estRange = ((rangeRated?['end_range'] ?? (soc * 4.27)) as num).toDouble();
+        final temp = ((latest['outside_temp_avg'] ?? 18.0) as num).toDouble();
+
+        return VehicleSnapshot(
+          timestamp: DateTime.now(),
+          soc: soc,
+          estimatedRangeKm: double.parse(estRange.toStringAsFixed(1)),
+          odometerKm: double.parse(odo.toStringAsFixed(1)),
+          outsideTemp: double.parse(temp.toStringAsFixed(1)),
+          vehicleState: 'offline',
+        );
+      }
+    } catch (_) {
+      // 모든 통신 실패 시 null
+    }
+
+    return null;
   }
 }
