@@ -169,13 +169,21 @@ class _VehicleStatusHeroCard extends StatelessWidget {
                 ? TeslaColors.accentBlue
                 : TeslaColors.batteryGreen));
 
-    final stateText = isAsleep
-        ? '절전 모드 (Asleep) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C'
-        : (snap.vehicleState == 'charging'
-            ? '충전 중 (Charging)'
-            : (snap.vehicleState == 'driving'
-                ? '주행 중 (Driving)'
-                : '온라인 (Online) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C'));
+    final String stateText;
+    if (snap.vehicleState == 'offline') {
+      stateText =
+          '오프라인 (절전 중) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C';
+    } else if (snap.vehicleState == 'asleep') {
+      stateText =
+          '절전 모드 (Asleep) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C';
+    } else if (snap.vehicleState == 'charging') {
+      stateText = '충전 중 (Charging)';
+    } else if (snap.vehicleState == 'driving') {
+      stateText = '주행 중 (Driving)';
+    } else {
+      stateText =
+          '온라인 (Online) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C';
+    }
 
     return Card(
       child: Padding(

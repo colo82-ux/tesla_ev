@@ -150,38 +150,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                               ),
                             ],
                           ),
-                          const Divider(height: 24),
-                          const Text(
-                            '충전 단가 프리셋 (클릭 시 해당 단가로 빠른 충전 입력)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: TeslaColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: appState.chargePresets.map((preset) {
-                              return ActionChip(
-                                visualDensity: VisualDensity.compact,
-                                avatar: const Icon(
-                                  Icons.bolt_rounded,
-                                  size: 16,
-                                  color: TeslaColors.batteryGreen,
-                                ),
-                                label: Text(
-                                  '${preset.locationType}: ${preset.unitPriceKrw}원/kWh',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                onPressed: () => _showQuickAddModal(
-                                  context,
-                                  appState.chargePresets,
-                                  initialPreset: preset,
-                                ),
-                              );
-                            }).toList(),
-                          ),
                         ],
                       ),
                     ),
