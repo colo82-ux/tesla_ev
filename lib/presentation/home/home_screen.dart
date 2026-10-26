@@ -166,7 +166,7 @@ class _VehicleStatusHeroCard extends StatelessWidget {
         : (snap.vehicleState == 'charging'
             ? TeslaColors.batteryGreen
             : (snap.vehicleState == 'driving'
-                ? TeslaColors.accentBlue
+                ? TeslaColors.electricBlue
                 : TeslaColors.batteryGreen));
 
     final String stateText;
