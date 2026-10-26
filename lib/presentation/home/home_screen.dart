@@ -159,6 +159,24 @@ class _VehicleStatusHeroCard extends StatelessWidget {
         ? UnitConverter.formatDateTime(state.lastSyncTime!)
         : '동기화 기록 없음';
 
+    final isAsleep =
+        snap.vehicleState == 'asleep' || snap.vehicleState == 'offline';
+    final stateColor = isAsleep
+        ? TeslaColors.warningAmber
+        : (snap.vehicleState == 'charging'
+            ? TeslaColors.batteryGreen
+            : (snap.vehicleState == 'driving'
+                ? TeslaColors.accentBlue
+                : TeslaColors.batteryGreen));
+
+    final stateText = isAsleep
+        ? '절전 모드 (Asleep) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C'
+        : (snap.vehicleState == 'charging'
+            ? '충전 중 (Charging)'
+            : (snap.vehicleState == 'driving'
+                ? '주행 중 (Driving)'
+                : '온라인 (Online) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C'));
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -180,16 +198,12 @@ class _VehicleStatusHeroCard extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: snap.vehicleState == 'asleep'
-                            ? TeslaColors.warningAmber
-                            : TeslaColors.batteryGreen,
+                        color: stateColor,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      snap.vehicleState == 'asleep'
-                          ? '절전 모드 (Asleep)'
-                          : '온라인 (Online) · 외기 ${UnitConverter.formatDecimal1(snap.outsideTemp)}°C',
+                      stateText,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
