@@ -151,6 +151,15 @@ class SyncService {
           carModel: resolvedModel,
           carName: resolvedName,
           softwareVersion: resolvedVer,
+          insideTemp: liveStatus.insideTemp > 0
+              ? liveStatus.insideTemp
+              : prevSnapshot.insideTemp,
+          outsideTemp: liveStatus.outsideTemp != 0
+              ? liveStatus.outsideTemp
+              : prevSnapshot.outsideTemp,
+          lastLocation: liveStatus.lastLocation.isNotEmpty
+              ? liveStatus.lastLocation
+              : prevSnapshot.lastLocation,
           tirePressureFl: liveStatus.tirePressureFl > 0
               ? liveStatus.tirePressureFl
               : prevSnapshot.tirePressureFl,
@@ -171,12 +180,15 @@ class SyncService {
         final latestSoc = charges.isNotEmpty
             ? charges.first.endSoc
             : (latestDrive != null ? latestDrive.endSoc : prevSnapshot.soc);
+        final latestOutsideTemp =
+            latestDrive?.outsideTempAvg ?? prevSnapshot.outsideTemp;
 
         finalSnapshot = prevSnapshot.copyWith(
           timestamp: now,
           soc: latestSoc,
           estimatedRangeKm:
               double.parse((latestSoc * 4.27).toStringAsFixed(1)),
+          outsideTemp: latestOutsideTemp,
           vehicleState: 'offline',
           carModel: extraModel ?? prevSnapshot.carModel,
           carName: extraName ?? prevSnapshot.carName,

@@ -5,10 +5,12 @@ class VehicleSnapshot {
   final double estimatedRangeKm; // 주행 가능 거리 (km)
   final double odometerKm; // 누적 주행거리 (km)
   final double outsideTemp; // 외기온도 (°C)
+  final double insideTemp; // 실내온도 (°C)
+  final String lastLocation; // 최근 주차 위치 / 주소
   final String vehicleState; // 'online' | 'asleep' | 'driving' | 'charging'
   final String carModel; // 차량 모델명 (예: Model Y)
   final String carName; // 차량 이름 (예: 찌이)
-  final String softwareVersion; // 현재 소프트웨어 버전 (예: 2024.44.25)
+  final String softwareVersion; // 현재 소프트웨어 버전 (예: 2026.26.6.2)
   final double tirePressureFl; // 전면 좌측 타이어 공기압 (psi)
   final double tirePressureFr; // 전면 우측 타이어 공기압 (psi)
   final double tirePressureRl; // 후면 좌측 타이어 공기압 (psi)
@@ -20,10 +22,12 @@ class VehicleSnapshot {
     required this.estimatedRangeKm,
     required this.odometerKm,
     required this.outsideTemp,
+    this.insideTemp = 20.7,
+    this.lastLocation = '평택시',
     required this.vehicleState,
     this.carModel = 'Model Y',
     this.carName = '찌이',
-    this.softwareVersion = '2024.44.25',
+    this.softwareVersion = '2026.26.6.2',
     this.tirePressureFl = 41.0,
     this.tirePressureFr = 41.0,
     this.tirePressureRl = 41.0,
@@ -40,6 +44,8 @@ class VehicleSnapshot {
     double? estimatedRangeKm,
     double? odometerKm,
     double? outsideTemp,
+    double? insideTemp,
+    String? lastLocation,
     String? vehicleState,
     String? carModel,
     String? carName,
@@ -55,6 +61,8 @@ class VehicleSnapshot {
       estimatedRangeKm: estimatedRangeKm ?? this.estimatedRangeKm,
       odometerKm: odometerKm ?? this.odometerKm,
       outsideTemp: outsideTemp ?? this.outsideTemp,
+      insideTemp: insideTemp ?? this.insideTemp,
+      lastLocation: lastLocation ?? this.lastLocation,
       vehicleState: vehicleState ?? this.vehicleState,
       carModel: carModel ?? this.carModel,
       carName: carName ?? this.carName,
@@ -73,6 +81,8 @@ class VehicleSnapshot {
       'estimated_range_km': estimatedRangeKm,
       'odometer_km': odometerKm,
       'outside_temp': outsideTemp,
+      'inside_temp': insideTemp,
+      'last_location': lastLocation,
       'vehicle_state': vehicleState,
       'car_model': carModel,
       'car_name': carName,
@@ -91,10 +101,12 @@ class VehicleSnapshot {
       estimatedRangeKm: (map['estimated_range_km'] as num).toDouble(),
       odometerKm: (map['odometer_km'] as num).toDouble(),
       outsideTemp: (map['outside_temp'] as num).toDouble(),
+      insideTemp: (map['inside_temp'] as num?)?.toDouble() ?? 20.7,
+      lastLocation: (map['last_location'] as String?) ?? '평택시',
       vehicleState: (map['vehicle_state'] as String?) ?? 'online',
       carModel: (map['car_model'] as String?) ?? 'Model Y',
       carName: (map['car_name'] as String?) ?? '찌이',
-      softwareVersion: (map['software_version'] as String?) ?? '2024.44.25',
+      softwareVersion: (map['software_version'] as String?) ?? '2026.26.6.2',
       tirePressureFl: (map['tire_pressure_fl'] as num?)?.toDouble() ?? 41.0,
       tirePressureFr: (map['tire_pressure_fr'] as num?)?.toDouble() ?? 41.0,
       tirePressureRl: (map['tire_pressure_rl'] as num?)?.toDouble() ?? 41.0,

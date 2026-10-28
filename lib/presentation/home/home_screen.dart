@@ -374,17 +374,18 @@ class _MonthlySummaryGrid extends StatelessWidget {
         accentColor: TeslaColors.teslaRed,
       ),
       _MetricCardData(
-        title: '타이어 공기압',
-        value: '${snap.avgTirePressurePsi.toStringAsFixed(0)} psi',
+        title: '차량 실내 / 외기 온도',
+        value:
+            '${snap.insideTemp.toStringAsFixed(1)}°C / ${snap.outsideTemp.toStringAsFixed(1)}°C',
         subtitle:
-            '전 ${snap.tirePressureFl.toStringAsFixed(0)} / 후 ${snap.tirePressureRl.toStringAsFixed(0)} (정상)',
-        icon: Icons.tire_repair_rounded,
+            '실내 ${snap.insideTemp.toStringAsFixed(1)}°C · 외기 ${snap.outsideTemp.toStringAsFixed(1)}°C',
+        icon: Icons.thermostat_rounded,
         accentColor: TeslaColors.electricBlue,
       ),
       _MetricCardData(
         title: '소프트웨어 현재 버전',
         value: snap.softwareVersion,
-        subtitle: '최신 버전 유지 중',
+        subtitle: 'OTA 펌웨어 자동 동기화',
         icon: Icons.system_update_rounded,
         accentColor: TeslaColors.purpleAccent,
       ),

@@ -30,11 +30,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _teslaDirectTokenCtrl = TextEditingController();
   final _teslaVehicleIdCtrl = TextEditingController();
 
-  final _carModelCtrl = TextEditingController(text: 'Model Y');
-  final _carNameCtrl = TextEditingController(text: '찌이');
-  final _softwareVersionCtrl = TextEditingController(text: '2024.44.25');
-  final _tirePressureCtrl = TextEditingController(text: '41.0');
-
   bool _preventWakeUp = true;
   bool _configLoaded = false;
 
@@ -53,7 +48,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final directToken = await storage.getTeslaDirectToken();
     final vehicleId = await storage.getTeslaVehicleId();
     final preventWake = await storage.getPreventWakeUp();
-    final snap = await storage.getVehicleSnapshot();
 
     if (!mounted) return;
     setState(() {
@@ -63,12 +57,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _teslaDirectTokenCtrl.text = directToken;
       _teslaVehicleIdCtrl.text = vehicleId;
       _preventWakeUp = preventWake;
-
-      _carModelCtrl.text = snap.carModel;
-      _carNameCtrl.text = snap.carName;
-      _softwareVersionCtrl.text = snap.softwareVersion;
-      _tirePressureCtrl.text = snap.avgTirePressurePsi.toStringAsFixed(1);
-
       _configLoaded = true;
     });
   }
@@ -80,10 +68,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _teslamateCarIdCtrl.dispose();
     _teslaDirectTokenCtrl.dispose();
     _teslaVehicleIdCtrl.dispose();
-    _carModelCtrl.dispose();
-    _carNameCtrl.dispose();
-    _softwareVersionCtrl.dispose();
-    _tirePressureCtrl.dispose();
     super.dispose();
   }
 
@@ -369,121 +353,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // 3. 차량 기본 정보 및 제원 설정
-                  const Text(
-                    '차량 정보 및 제원 설정',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: TeslaColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '동기화 실행 시 TeslaMate / Fleet API로부터 수신한 실차 데이터(소프트웨어 버전, TPMS 공기압, 차량명)가 자동 갱신됩니다. 필요한 경우 아래에서 직접 수정할 수도 있습니다.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: TeslaColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _carModelCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: '차량 모델명 (예: Model Y)',
-                                    prefixIcon: Icon(Icons.electric_car_rounded),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: _carNameCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: '차량 이름 (예: 찌이)',
-                                    prefixIcon: Icon(Icons.badge_rounded),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _softwareVersionCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: '소프트웨어 버전',
-                                    prefixIcon:
-                                        Icon(Icons.system_update_rounded),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  controller: _tirePressureCtrl,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  decoration: const InputDecoration(
-                                    labelText: '타이어 공기압 (psi)',
-                                    prefixIcon: Icon(Icons.tire_repair_rounded),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final press =
-                                    double.tryParse(_tirePressureCtrl.text) ??
-                                        41.0;
-                                await ref
-                                    .read(teslaAppProvider.notifier)
-                                    .updateVehicleInfo(
-                                      carModel: _carModelCtrl.text.trim(),
-                                      carName: _carNameCtrl.text.trim(),
-                                      softwareVersion:
-                                          _softwareVersionCtrl.text.trim(),
-                                      tirePressureFl: press,
-                                      tirePressureFr: press,
-                                      tirePressureRl: press,
-                                      tirePressureRr: press,
-                                    );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('차량 정보가 성공적으로 저장되었습니다.'),
-                                    ),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.check_circle_outline_rounded,
-                                  size: 18),
-                              label: const Text('차량 정보 저장'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 4. 로컬 SQLite DB 백업(JSON/CSV 내보내기) 및 복원 섹션
+                  // 3. 로컬 SQLite DB 백업(JSON/CSV 내보내기) 및 복원 섹션
                   const Text(
                     '로컬 SQLite 데이터베이스 백업 및 복원',
                     style: TextStyle(

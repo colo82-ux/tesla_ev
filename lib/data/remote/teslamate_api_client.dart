@@ -353,6 +353,10 @@ class TeslaMateApiClient {
                     status['outside_temp'] ??
                     21.0) as num)
                 .toDouble();
+        final insideTemp = ((climateDetails['inside_temp'] ??
+                    status['inside_temp'] ??
+                    20.7) as num)
+                .toDouble();
         final stateStr = (status['state'] ?? 'online').toString();
 
         final rawModel = (carDetails['model'] ?? status['model'] ?? '').toString();
@@ -361,7 +365,7 @@ class TeslaMateApiClient {
             : 'Model Y';
         final carName = (carDetails['name'] ?? status['name'] ?? '찌이').toString();
         final version =
-            (carDetails['version'] ?? status['version'] ?? '2024.44.25').toString();
+            (carDetails['version'] ?? status['version'] ?? '2026.26.6.2').toString();
 
         final tpmsFl = UnitConverter.toTirePsi(
           tpmsDetails['tpms_pressure_fl'] ?? status['tpms_pressure_fl'],
@@ -382,6 +386,7 @@ class TeslaMateApiClient {
           estimatedRangeKm: double.parse(estRange.toStringAsFixed(1)),
           odometerKm: double.parse(odo.toStringAsFixed(1)),
           outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
+          insideTemp: double.parse(insideTemp.toStringAsFixed(1)),
           vehicleState: stateStr,
           carModel: carModel,
           carName: carName,
@@ -496,6 +501,9 @@ class TeslaMateApiClient {
         final soc = ((batteryDetails?['end_battery_level'] ?? 75) as num).toInt();
         final estRange = ((rangeRated?['end_range'] ?? (soc * 4.27)) as num).toDouble();
         final temp = ((latest['outside_temp_avg'] ?? 18.0) as num).toDouble();
+        final insideTemp =
+            ((latest['inside_temp_avg'] ?? 20.7) as num).toDouble();
+        final endAddress = (latest['end_address'] ?? '평택시').toString();
 
         return VehicleSnapshot(
           timestamp: DateTime.now(),
@@ -503,10 +511,12 @@ class TeslaMateApiClient {
           estimatedRangeKm: double.parse(estRange.toStringAsFixed(1)),
           odometerKm: double.parse(odo.toStringAsFixed(1)),
           outsideTemp: double.parse(temp.toStringAsFixed(1)),
+          insideTemp: double.parse(insideTemp.toStringAsFixed(1)),
+          lastLocation: endAddress,
           vehicleState: 'offline',
           carModel: 'Model Y',
           carName: '찌이',
-          softwareVersion: '2024.44.25',
+          softwareVersion: '2026.26.6.2',
           tirePressureFl: 41.0,
           tirePressureFr: 41.0,
           tirePressureRl: 41.0,
