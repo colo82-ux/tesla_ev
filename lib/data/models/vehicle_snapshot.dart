@@ -6,6 +6,13 @@ class VehicleSnapshot {
   final double odometerKm; // 누적 주행거리 (km)
   final double outsideTemp; // 외기온도 (°C)
   final String vehicleState; // 'online' | 'asleep' | 'driving' | 'charging'
+  final String carModel; // 차량 모델명 (예: Model Y)
+  final String carName; // 차량 이름 (예: 찌이)
+  final String softwareVersion; // 현재 소프트웨어 버전 (예: 2024.44.25)
+  final double tirePressureFl; // 전면 좌측 타이어 공기압 (psi)
+  final double tirePressureFr; // 전면 우측 타이어 공기압 (psi)
+  final double tirePressureRl; // 후면 좌측 타이어 공기압 (psi)
+  final double tirePressureRr; // 후면 우측 타이어 공기압 (psi)
 
   const VehicleSnapshot({
     required this.timestamp,
@@ -14,7 +21,18 @@ class VehicleSnapshot {
     required this.odometerKm,
     required this.outsideTemp,
     required this.vehicleState,
+    this.carModel = 'Model Y',
+    this.carName = '찌이',
+    this.softwareVersion = '2024.44.25',
+    this.tirePressureFl = 41.0,
+    this.tirePressureFr = 41.0,
+    this.tirePressureRl = 41.0,
+    this.tirePressureRr = 41.0,
   });
+
+  /// 평균 타이어 공기압 (psi)
+  double get avgTirePressurePsi =>
+      (tirePressureFl + tirePressureFr + tirePressureRl + tirePressureRr) / 4.0;
 
   VehicleSnapshot copyWith({
     DateTime? timestamp,
@@ -23,6 +41,13 @@ class VehicleSnapshot {
     double? odometerKm,
     double? outsideTemp,
     String? vehicleState,
+    String? carModel,
+    String? carName,
+    String? softwareVersion,
+    double? tirePressureFl,
+    double? tirePressureFr,
+    double? tirePressureRl,
+    double? tirePressureRr,
   }) {
     return VehicleSnapshot(
       timestamp: timestamp ?? this.timestamp,
@@ -31,6 +56,13 @@ class VehicleSnapshot {
       odometerKm: odometerKm ?? this.odometerKm,
       outsideTemp: outsideTemp ?? this.outsideTemp,
       vehicleState: vehicleState ?? this.vehicleState,
+      carModel: carModel ?? this.carModel,
+      carName: carName ?? this.carName,
+      softwareVersion: softwareVersion ?? this.softwareVersion,
+      tirePressureFl: tirePressureFl ?? this.tirePressureFl,
+      tirePressureFr: tirePressureFr ?? this.tirePressureFr,
+      tirePressureRl: tirePressureRl ?? this.tirePressureRl,
+      tirePressureRr: tirePressureRr ?? this.tirePressureRr,
     );
   }
 
@@ -42,6 +74,13 @@ class VehicleSnapshot {
       'odometer_km': odometerKm,
       'outside_temp': outsideTemp,
       'vehicle_state': vehicleState,
+      'car_model': carModel,
+      'car_name': carName,
+      'software_version': softwareVersion,
+      'tire_pressure_fl': tirePressureFl,
+      'tire_pressure_fr': tirePressureFr,
+      'tire_pressure_rl': tirePressureRl,
+      'tire_pressure_rr': tirePressureRr,
     };
   }
 
@@ -53,6 +92,13 @@ class VehicleSnapshot {
       odometerKm: (map['odometer_km'] as num).toDouble(),
       outsideTemp: (map['outside_temp'] as num).toDouble(),
       vehicleState: (map['vehicle_state'] as String?) ?? 'online',
+      carModel: (map['car_model'] as String?) ?? 'Model Y',
+      carName: (map['car_name'] as String?) ?? '찌이',
+      softwareVersion: (map['software_version'] as String?) ?? '2024.44.25',
+      tirePressureFl: (map['tire_pressure_fl'] as num?)?.toDouble() ?? 41.0,
+      tirePressureFr: (map['tire_pressure_fr'] as num?)?.toDouble() ?? 41.0,
+      tirePressureRl: (map['tire_pressure_rl'] as num?)?.toDouble() ?? 41.0,
+      tirePressureRr: (map['tire_pressure_rr'] as num?)?.toDouble() ?? 41.0,
     );
   }
 }

@@ -65,34 +65,30 @@ class HomeScreen extends ConsumerWidget {
           : ResponsiveLayout.constrainMaxWidth(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await notifier.syncNow();
+                  final result = await notifier.syncNow();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result.message),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
                 },
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // 1. 상단: 차량 배터리 상태 & 누적 주행거리 & [지금 동기화] 카드
-                    _VehicleStatusHeroCard(
-                      state: appState,
-                      onSyncPressed: () async {
-                        final result = await notifier.syncNow();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(result.message),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                    ),
+                    // 1. 상단: 차량 배터리 상태 & 누적 주행거리 & 차량 모델/이름 카드
+                    _VehicleStatusHeroCard(state: appState),
                     const SizedBox(height: 20),
 
-                    // 2. 중단: 이번 달 핵심 요약 카드 (전비, 총 주행거리, 총 충전비용, 1km당 주행원가)
+                    // 2. 중단: 핵심 요약 카드 (전비, 총 주행거리, 총 충전비용, 1km당 주행원가, 타이어 공기압, 소프트웨어 버전)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          '이번 달 운행 및 비용 요약',
+                          '운행 및 차량 정보',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -141,11 +137,9 @@ class HomeScreen extends ConsumerWidget {
 
 class _VehicleStatusHeroCard extends StatelessWidget {
   final TeslaAppState state;
-  final VoidCallback onSyncPressed;
 
   const _VehicleStatusHeroCard({
     required this.state,
-    required this.onSyncPressed,
   });
 
   @override
@@ -191,7 +185,7 @@ class _VehicleStatusHeroCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 상태 배지 및 마지막 동기화 시각 + [지금 동기화] 버튼
+            // 상태 배지 및 차량 모델명 & 차량 이름 (Model Y - 찌이)
             Wrap(
               spacing: 12,
               runSpacing: 10,
@@ -220,19 +214,33 @@ class _VehicleStatusHeroCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: state.isSyncing ? null : onSyncPressed,
-                  icon: state.isSyncing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.sync_rounded, size: 18),
-                  label: Text(state.isSyncing ? '동기화 중...' : '지금 동기화'),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: TeslaColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: TeslaColors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.directions_car_rounded,
+                        size: 15,
+                        color: TeslaColors.teslaRed,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${snap.carModel} - ${snap.carName}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: TeslaColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -303,10 +311,10 @@ class _VehicleStatusHeroCard extends StatelessWidget {
                   ),
                 ),
                 const Text(
-                  'Offline-first SQLite',
+                  '↓ 아래로 당겨 동기화',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                     color: TeslaColors.electricBlue,
                   ),
                 ),
@@ -332,6 +340,7 @@ class _MonthlySummaryGrid extends StatelessWidget {
       foldCount: 4,
     );
 
+    final snap = state.snapshot;
     final cards = [
       _MetricCardData(
         title: '이번 달 평균 전비',
@@ -363,6 +372,21 @@ class _MonthlySummaryGrid extends StatelessWidget {
         subtitle: '내연기관 대비 약 70% 절감',
         icon: Icons.savings_rounded,
         accentColor: TeslaColors.teslaRed,
+      ),
+      _MetricCardData(
+        title: '타이어 공기압',
+        value: '${snap.avgTirePressurePsi.toStringAsFixed(0)} psi',
+        subtitle:
+            '전 ${snap.tirePressureFl.toStringAsFixed(0)} / 후 ${snap.tirePressureRl.toStringAsFixed(0)} (정상)',
+        icon: Icons.tire_repair_rounded,
+        accentColor: TeslaColors.electricBlue,
+      ),
+      _MetricCardData(
+        title: '소프트웨어 현재 버전',
+        value: snap.softwareVersion,
+        subtitle: '최신 버전 유지 중',
+        icon: Icons.system_update_rounded,
+        accentColor: TeslaColors.purpleAccent,
       ),
     ];
 
@@ -458,9 +482,19 @@ class _Last7DaysEfficiencyChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spots = <FlSpot>[];
+    double maxPointEff = 0.0;
     for (int i = 0; i < points.length; i++) {
       spots.add(FlSpot(i.toDouble(), points[i].avgEfficiencyKmKwh));
+      if (points[i].avgEfficiencyKmKwh > maxPointEff) {
+        maxPointEff = points[i].avgEfficiencyKmKwh;
+      }
     }
+
+    // 데이터 최대값에 +1 적용 (데이터가 없거나 낮은 경우에도 기본 최소 10.0 확보)
+    final double calculatedMaxY =
+        (maxPointEff > 0 && (maxPointEff + 1.0) > 10.0)
+            ? (maxPointEff + 1.0).ceilToDouble()
+            : 10.0;
 
     return Card(
       child: Padding(
@@ -502,7 +536,7 @@ class _Last7DaysEfficiencyChartCard extends StatelessWidget {
               child: LineChart(
                 LineChartData(
                   minY: 0,
-                  maxY: 9.0,
+                  maxY: calculatedMaxY,
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,

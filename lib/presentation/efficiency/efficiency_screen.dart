@@ -28,85 +28,182 @@ class EfficiencyScreen extends ConsumerWidget {
             icon: const Icon(Icons.add_road_rounded, size: 18),
             label: const Text('수기 트립 추가'),
           ),
-          const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            tooltip: '더보기',
+            onSelected: (val) async {
+              if (val == 'full_sync') {
+                final scaffold = ScaffoldMessenger.of(context);
+                scaffold.showSnackBar(
+                  const SnackBar(
+                    content: Text('전체 주행 기록 재동기화 중...'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                final res = await ref
+                    .read(teslaAppProvider.notifier)
+                    .syncNow(fullSync: true);
+                scaffold.showSnackBar(
+                  SnackBar(
+                    content: Text(res.message),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'full_sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded,
+                        size: 18, color: TeslaColors.electricBlue),
+                    SizedBox(width: 8),
+                    Text('전체 기록 다시 동기화 (복원)'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: appState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : ResponsiveLayout.constrainMaxWidth(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // 1. 외기온도 구간별 평균 전비 비교 막대 차트
-                  const Text(
-                    '외기온도 구간별 평균 전비 (km/kWh)',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: TeslaColors.textPrimary,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  final result =
+                      await ref.read(teslaAppProvider.notifier).syncNow();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result.message),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // 1. 외기온도 구간별 평균 전비 비교 막대 차트
+                    const Text(
+                      '외기온도 구간별 평균 전비 (km/kWh)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: TeslaColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _TemperatureBracketBarChartCard(
-                    bracketMap: appState.efficiencyByTempBracket,
-                    overallAvg: appState.overallAvgEfficiencyKmKwh,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 2. 주차 중 대기 소모 전력 (Vampire Drain) 통계
-                  const Text(
-                    '주차 중 대기 소모 전력 (Vampire Drain) 통계',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: TeslaColors.textPrimary,
+                    const SizedBox(height: 12),
+                    _TemperatureBracketBarChartCard(
+                      bracketMap: appState.efficiencyByTempBracket,
+                      overallAvg: appState.overallAvgEfficiencyKmKwh,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _VampireDrainStatsCard(drains: appState.vampireDrains),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // 3. 주행 트립별 상세 리스트
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '주행 트립별 상세 기록',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: TeslaColors.textPrimary,
+                    // 2. 주차 중 대기 소모 전력 (Vampire Drain) 통계
+                    const Text(
+                      '주차 중 대기 소모 전력 (Vampire Drain) 통계',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: TeslaColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _VampireDrainStatsCard(drains: appState.vampireDrains),
+                    const SizedBox(height: 24),
+
+                    // 3. 주행 트립별 상세 리스트
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '주행 트립별 상세 기록',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: TeslaColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          '전체 평균 ${UnitConverter.formatDecimal2(appState.overallAvgEfficiencyKmKwh)} km/kWh',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: TeslaColors.batteryGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...appState.drives.map(
+                      (drive) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _DriveTripCard(
+                          drive: drive,
+                          onDelete: drive.id != null
+                              ? () => _confirmDeleteDrive(context, ref, drive)
+                              : null,
                         ),
                       ),
-                      Text(
-                        '전체 평균 ${UnitConverter.formatDecimal2(appState.overallAvgEfficiencyKmKwh)} km/kWh',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: TeslaColors.batteryGreen,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ...appState.drives.map(
-                    (drive) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _DriveTripCard(
-                        drive: drive,
-                        onDelete: drive.id != null
-                            ? () => ref
-                                .read(teslaAppProvider.notifier)
-                                .deleteDriveLog(drive.id!)
-                            : null,
-                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
     );
+  }
+
+  Future<void> _confirmDeleteDrive(
+    BuildContext context,
+    WidgetRef ref,
+    DriveLog drive,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: TeslaColors.surface,
+        title: const Text(
+          '주행 기록 삭제',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          '${UnitConverter.formatDateTime(drive.startTime)} 주행 기록(${UnitConverter.formatDecimal1(drive.distanceKm)} km)을 정말 삭제하시겠습니까?\n\n※ 참고: 증분 동기화 방식이므로 삭제된 기록은 일반 동기화 시 다시 나타나지 않으며, 상단 메뉴의 [전체 기록 다시 동기화]를 통해 서버로부터 다시 복원할 수 있습니다.',
+          style: const TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: TeslaColors.teslaRed,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && drive.id != null) {
+      await ref.read(teslaAppProvider.notifier).deleteDriveLog(drive.id!);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('주행 트립 기록이 삭제되었습니다.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showAddManualDriveModal(BuildContext context, WidgetRef ref) {
@@ -671,13 +768,12 @@ class _DriveTripCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '소모 ${drive.usedEnergyKwh}kWh · SoC ${drive.startSoc}%→${drive.endSoc}% · ${drive.outsideTempAvg}°C',
+                    '소모 ${UnitConverter.formatDecimal1(drive.usedEnergyKwh)} kWh · SoC ${drive.startSoc}%→${drive.endSoc}% · ${UnitConverter.formatDecimal1(drive.outsideTempAvg)}°C',
                     style: const TextStyle(
                       fontSize: 12,
                       color: TeslaColors.textSecondary,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                   const SizedBox(height: 2),
                   Text(

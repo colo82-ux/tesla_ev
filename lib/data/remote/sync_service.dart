@@ -1,5 +1,7 @@
 import '../../core/storage/secure_storage_service.dart';
 import '../../core/utils/unit_converter.dart';
+import '../local/database_helper.dart';
+import '../local/mock_data_seeder.dart';
 import '../models/drive_log.dart';
 import '../models/expense_log.dart';
 import '../models/vehicle_snapshot.dart';
@@ -50,17 +52,18 @@ class SyncService {
         _expenseRepository = expenseRepository;
 
   /// 현재 설정된 동기화 모드에 따라 주행/충전 데이터를 동기화하고 로컬 SQLite에 Upsert
-  Future<SyncResult> syncNow() async {
+  /// [fullSync]가 true일 경우 증분 동기화(since)를 건너뛰고 전체 데이터를 재동기화합니다.
+  Future<SyncResult> syncNow({bool fullSync = false}) async {
     final mode = await _storage.getActiveSyncMode();
     if (mode == SyncMode.teslamate) {
-      return _syncFromTeslaMate();
+      return _syncFromTeslaMate(fullSync: fullSync);
     } else {
-      return _syncFromTeslaDirect();
+      return _syncFromTeslaDirect(fullSync: fullSync);
     }
   }
 
   /// 모드 A: TeslaMate API 연동
-  Future<SyncResult> _syncFromTeslaMate() async {
+  Future<SyncResult> _syncFromTeslaMate({bool fullSync = false}) async {
     final baseUrl = await _storage.getTeslaMateBaseUrl();
     final token = await _storage.getTeslaMateToken();
     final carId = await _storage.getTeslaMateCarId();
@@ -72,6 +75,7 @@ class SyncService {
       return _simulateDemoSync(
         SyncMode.teslamate,
         fallbackReason: 'TeslaMate 서버 URL 미설정',
+        fullSync: fullSync,
       );
     }
 
@@ -82,9 +86,9 @@ class SyncService {
         carId: carId,
       );
 
-      // 로컬 DB가 비어있는 경우 과거 전체 주행/충전 기록을 모두 수신하도록 since를 null로 처리
+      // 전체 동기화이거나 로컬 DB가 비어있는 경우 과거 전체 주행/충전 기록을 모두 수신하도록 since를 null로 처리
       final localDrives = await _driveRepository.getAllDrives();
-      final sinceParam = localDrives.isEmpty ? null : lastSync;
+      final sinceParam = (fullSync || localDrives.isEmpty) ? null : lastSync;
 
       final drives = await client.fetchDrives(since: sinceParam);
       final charges = await client.fetchCharges(
@@ -115,7 +119,16 @@ class SyncService {
 
       final VehicleSnapshot finalSnapshot;
       if (liveStatus != null) {
-        finalSnapshot = liveStatus.copyWith(timestamp: now);
+        finalSnapshot = liveStatus.copyWith(
+          timestamp: now,
+          carModel: prevSnapshot.carModel,
+          carName: prevSnapshot.carName,
+          softwareVersion: prevSnapshot.softwareVersion,
+          tirePressureFl: prevSnapshot.tirePressureFl,
+          tirePressureFr: prevSnapshot.tirePressureFr,
+          tirePressureRl: prevSnapshot.tirePressureRl,
+          tirePressureRr: prevSnapshot.tirePressureRr,
+        );
       } else {
         final latestDrive = drives.isNotEmpty
             ? drives.reduce((a, b) => a.endTime.isAfter(b.endTime) ? a : b)
@@ -135,25 +148,27 @@ class SyncService {
       await _storage.saveVehicleSnapshot(finalSnapshot);
       await _storage.setLastSyncTime(now);
 
+      final syncTypeLabel = fullSync ? '전체 재동기화' : '동기화';
       return SyncResult(
         mode: SyncMode.teslamate,
         syncedDrives: driveCount,
         syncedCharges: chargeCount,
         timestamp: now,
         message:
-            'TeslaMate 동기화 완료 (배터리 ${finalSnapshot.soc}%, 누적 ${finalSnapshot.odometerKm}km · 주행 ${driveCount}건, 충전 ${chargeCount}건)',
+            'TeslaMate $syncTypeLabel 완료 (배터리 ${finalSnapshot.soc}%, 누적 ${finalSnapshot.odometerKm}km · 주행 ${driveCount}건, 충전 ${chargeCount}건)',
       );
     } catch (e) {
       // 실제 서버에 닿을 수 없는 로컬 테스트 환경일 경우 시뮬레이션 결과 제공
       return _simulateDemoSync(
         SyncMode.teslamate,
         fallbackReason: '서버 연결 실패($e)로 데모 동기화 실행',
+        fullSync: fullSync,
       );
     }
   }
 
   /// 모드 B: Tesla 공식 Fleet API 직접 호출 연동
-  Future<SyncResult> _syncFromTeslaDirect() async {
+  Future<SyncResult> _syncFromTeslaDirect({bool fullSync = false}) async {
     final baseUrl = await _storage.getTeslaFleetBaseUrl();
     final token = await _storage.getTeslaDirectToken();
     final vehicleId = await _storage.getTeslaVehicleId();
@@ -163,7 +178,7 @@ class SyncService {
     final presets = await _storage.getChargePresets();
 
     if (token.isEmpty) {
-      return _simulateDemoSync(SyncMode.directFleet);
+      return _simulateDemoSync(SyncMode.directFleet, fullSync: fullSync);
     }
 
     try {
@@ -227,17 +242,24 @@ class SyncService {
       return _simulateDemoSync(
         SyncMode.directFleet,
         fallbackReason: 'Fleet API 데모 스냅샷 동기화 실행',
+        fullSync: fullSync,
       );
     }
   }
 
-  /// API 토큰 미설정 또는 오프라인 테스트 시 현실적인 최신 주행 1건을 생성/갱신하는 시뮬레이터
+  /// API 토큰 미설정 또는 오프라인 테스트 시 현실적인 주행 데이터를 생성/복원하는 시뮬레이터
   Future<SyncResult> _simulateDemoSync(
     SyncMode mode, {
     String? fallbackReason,
+    bool fullSync = false,
   }) async {
     final now = DateTime.now();
     final prevSnapshot = await _storage.getVehicleSnapshot();
+
+    if (fullSync) {
+      final db = await DatabaseHelper.instance.database;
+      await MockDataSeeder.seedInitialData(db);
+    }
 
     const simulatedDistanceKm = 14.6;
     const simulatedUsedKwh = 2.15;
@@ -263,12 +285,11 @@ class SyncService {
 
     await _driveRepository.upsertDrive(demoDrive);
 
-    final updatedSnapshot = VehicleSnapshot(
+    final updatedSnapshot = prevSnapshot.copyWith(
       timestamp: now,
       soc: newSoc,
       estimatedRangeKm: double.parse((newSoc * 4.88).toStringAsFixed(1)),
       odometerKm: newOdo,
-      outsideTemp: prevSnapshot.outsideTemp,
       vehicleState: 'online',
     );
 
@@ -276,14 +297,15 @@ class SyncService {
     await _storage.setLastSyncTime(now);
 
     final prefix = fallbackReason ?? '[오프라인 데모 모드]';
+    final syncType = fullSync ? '전체 데이터 복원 및 동기화' : '동기화';
     return SyncResult(
       mode: mode,
-      syncedDrives: 1,
+      syncedDrives: fullSync ? 7 : 1,
       syncedCharges: 0,
       usedOfflineSimulation: true,
       timestamp: now,
       message:
-          '$prefix ${mode.label} 기준 최근 주행 1건(${simulatedDistanceKm}km, 전비 ${demoDrive.efficiencyKmKwh}km/kWh)이 동기화되었습니다.',
+          '$prefix ${mode.label} 기준 $syncType 완료 (최근 주행 전비 ${demoDrive.efficiencyKmKwh} km/kWh)',
     );
   }
 }

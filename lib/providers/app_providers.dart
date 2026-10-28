@@ -344,6 +344,13 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
               odometerKm: 8797.0,
               outsideTemp: 21.0,
               vehicleState: 'online',
+              carModel: 'Model Y',
+              carName: '찌이',
+              softwareVersion: '2024.44.25',
+              tirePressureFl: 41.0,
+              tirePressureFr: 41.0,
+              tirePressureRl: 41.0,
+              tirePressureRr: 41.0,
             ),
           ),
         );
@@ -376,10 +383,10 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
     );
   }
 
-  /// [지금 동기화] 실행
-  Future<SyncResult> syncNow() async {
+  /// [지금 동기화] 또는 [전체 재동기화] 실행
+  Future<SyncResult> syncNow({bool fullSync = false}) async {
     state = state.copyWith(isSyncing: true, lastSyncMessage: null);
-    final result = await _syncService.syncNow();
+    final result = await _syncService.syncNow(fullSync: fullSync);
     await loadAll();
     state = state.copyWith(
       isSyncing: false,
