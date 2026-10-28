@@ -115,16 +115,20 @@ class SyncService {
       // 차량 최신 스냅샷 갱신 (1차 실시간 /status, 2차 :4000 웹 대시보드, 3차 최신 주행 /drives 우선 반영)
       final liveStatus = await client.fetchCarStatus();
       final carDetails = await client.fetchCarDetails();
+      final latestSoftwareVer = await client.fetchLatestSoftwareVersion();
       final prevSnapshot = await _storage.getVehicleSnapshot();
       final now = DateTime.now();
 
-      // carDetails 메타데이터가 있으면 모델명, 차량 이름, 소프트웨어 버전 보강
+      // carDetails 메타데이터가 있으면 모델명, 차량 이름, 소프트웨어 버전 실시간 추출
       final extraName = carDetails?['name']?.toString();
-      final rawExtraModel = carDetails?['model']?.toString();
-      final extraModel = (rawExtraModel != null && rawExtraModel.isNotEmpty)
-          ? (rawExtraModel.startsWith('Model') ? rawExtraModel : 'Model $rawExtraModel')
+      final rawModel = (carDetails?['car_details']?['model'] ??
+              carDetails?['model'])
+          ?.toString();
+      final extraModel = (rawModel != null && rawModel.isNotEmpty)
+          ? (rawModel.startsWith('Model') ? rawModel : 'Model $rawModel')
           : null;
-      final extraVersion = carDetails?['car_details']?['version']?.toString() ??
+      final extraVersion = latestSoftwareVer ??
+          carDetails?['car_details']?['version']?.toString() ??
           carDetails?['version']?.toString();
 
       final VehicleSnapshot finalSnapshot;

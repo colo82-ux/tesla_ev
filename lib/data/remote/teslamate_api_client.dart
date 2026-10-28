@@ -267,11 +267,44 @@ class TeslaMateApiClient {
         '/api/v1/cars/$carId',
       );
       final data = response.data ?? {};
-      final car = (data['data']?['car'] ?? data['car'] ?? data) as Map<String, dynamic>;
-      return car;
+      final carData = data['data'];
+      if (carData is Map<String, dynamic>) {
+        if (carData['cars'] is List && (carData['cars'] as List).isNotEmpty) {
+          return carData['cars'][0] as Map<String, dynamic>;
+        }
+        if (carData['car'] is Map<String, dynamic>) {
+          return carData['car'] as Map<String, dynamic>;
+        }
+        return carData;
+      }
+      return null;
     } catch (_) {
       return null;
     }
+  }
+
+  /// TeslaMate 소프트웨어 최신 버전 조회 (/api/v1/cars/{id}/updates)
+  Future<String?> fetchLatestSoftwareVersion() async {
+    try {
+      final dio = DioClient.create(
+        baseUrl: _normalizedApiBaseUrl,
+        bearerToken: bearerToken,
+      );
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/v1/cars/$carId/updates',
+      );
+      final data = response.data ?? {};
+      final updates =
+          (data['data']?['updates'] ?? data['updates']) as List<dynamic>?;
+      if (updates != null && updates.isNotEmpty) {
+        final latest = updates.first as Map<String, dynamic>;
+        final version = latest['version']?.toString();
+        if (version != null && version.isNotEmpty) {
+          return version;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// TeslaMate 실시간 차량 상태 조회
