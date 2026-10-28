@@ -114,20 +114,51 @@ class SyncService {
 
       // 차량 최신 스냅샷 갱신 (1차 실시간 /status, 2차 :4000 웹 대시보드, 3차 최신 주행 /drives 우선 반영)
       final liveStatus = await client.fetchCarStatus();
+      final carDetails = await client.fetchCarDetails();
       final prevSnapshot = await _storage.getVehicleSnapshot();
       final now = DateTime.now();
 
+      // carDetails 메타데이터가 있으면 모델명, 차량 이름, 소프트웨어 버전 보강
+      final extraName = carDetails?['name']?.toString();
+      final rawExtraModel = carDetails?['model']?.toString();
+      final extraModel = (rawExtraModel != null && rawExtraModel.isNotEmpty)
+          ? (rawExtraModel.startsWith('Model') ? rawExtraModel : 'Model $rawExtraModel')
+          : null;
+      final extraVersion = carDetails?['car_details']?['version']?.toString() ??
+          carDetails?['version']?.toString();
+
       final VehicleSnapshot finalSnapshot;
       if (liveStatus != null) {
+        final resolvedModel = extraModel ??
+            (liveStatus.carModel.isNotEmpty
+                ? liveStatus.carModel
+                : prevSnapshot.carModel);
+        final resolvedName = extraName ??
+            (liveStatus.carName.isNotEmpty
+                ? liveStatus.carName
+                : prevSnapshot.carName);
+        final resolvedVer = extraVersion ??
+            (liveStatus.softwareVersion.isNotEmpty
+                ? liveStatus.softwareVersion
+                : prevSnapshot.softwareVersion);
+
         finalSnapshot = liveStatus.copyWith(
           timestamp: now,
-          carModel: prevSnapshot.carModel,
-          carName: prevSnapshot.carName,
-          softwareVersion: prevSnapshot.softwareVersion,
-          tirePressureFl: prevSnapshot.tirePressureFl,
-          tirePressureFr: prevSnapshot.tirePressureFr,
-          tirePressureRl: prevSnapshot.tirePressureRl,
-          tirePressureRr: prevSnapshot.tirePressureRr,
+          carModel: resolvedModel,
+          carName: resolvedName,
+          softwareVersion: resolvedVer,
+          tirePressureFl: liveStatus.tirePressureFl > 0
+              ? liveStatus.tirePressureFl
+              : prevSnapshot.tirePressureFl,
+          tirePressureFr: liveStatus.tirePressureFr > 0
+              ? liveStatus.tirePressureFr
+              : prevSnapshot.tirePressureFr,
+          tirePressureRl: liveStatus.tirePressureRl > 0
+              ? liveStatus.tirePressureRl
+              : prevSnapshot.tirePressureRl,
+          tirePressureRr: liveStatus.tirePressureRr > 0
+              ? liveStatus.tirePressureRr
+              : prevSnapshot.tirePressureRr,
         );
       } else {
         final latestDrive = drives.isNotEmpty
@@ -143,6 +174,9 @@ class SyncService {
           estimatedRangeKm:
               double.parse((latestSoc * 4.27).toStringAsFixed(1)),
           vehicleState: 'offline',
+          carModel: extraModel ?? prevSnapshot.carModel,
+          carName: extraName ?? prevSnapshot.carName,
+          softwareVersion: extraVersion ?? prevSnapshot.softwareVersion,
         );
       }
       await _storage.saveVehicleSnapshot(finalSnapshot);

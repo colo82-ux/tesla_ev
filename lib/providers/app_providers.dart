@@ -454,6 +454,29 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
     await loadAll();
   }
 
+  /// 차량 정보(모델명, 차량 애칭, 소프트웨어 버전, 타이어 공기압) 수동 업데이트 및 저장
+  Future<void> updateVehicleInfo({
+    String? carModel,
+    String? carName,
+    String? softwareVersion,
+    double? tirePressureFl,
+    double? tirePressureFr,
+    double? tirePressureRl,
+    double? tirePressureRr,
+  }) async {
+    final updated = state.snapshot.copyWith(
+      carModel: carModel,
+      carName: carName,
+      softwareVersion: softwareVersion,
+      tirePressureFl: tirePressureFl,
+      tirePressureFr: tirePressureFr,
+      tirePressureRl: tirePressureRl,
+      tirePressureRr: tirePressureRr,
+    );
+    await _storage.saveVehicleSnapshot(updated);
+    state = state.copyWith(snapshot: updated);
+  }
+
   /// 소모품 교체 완료 처리 (현재 누적 주행거리와 오늘 날짜로 갱신)
   Future<void> markMaintenanceReplacedNow(MaintenanceItem item) async {
     final updated = item.copyWith(

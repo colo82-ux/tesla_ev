@@ -79,6 +79,8 @@ class TeslaDirectApiClient {
         (responseObj['vehicle_state'] ?? <String, dynamic>{}) as Map<String, dynamic>;
     final climateState =
         (responseObj['climate_state'] ?? <String, dynamic>{}) as Map<String, dynamic>;
+    final vehicleConfig =
+        (responseObj['vehicle_config'] ?? <String, dynamic>{}) as Map<String, dynamic>;
 
     final currentSoc =
         ((chargeState['battery_level'] ?? previousSnapshot.soc) as num).toInt();
@@ -93,6 +95,43 @@ class TeslaDirectApiClient {
             .toDouble();
     final sentryMode = (vehicleStateMap['sentry_mode'] as bool?) ?? false;
 
+    // 소프트웨어 버전, 차량 이름, 모델명, 타이어 공기압 실시간 추출
+    final softwareVer = (vehicleStateMap['car_version'] as String?) ??
+        previousSnapshot.softwareVersion;
+    final carName = (vehicleStateMap['vehicle_name'] as String?) ??
+        previousSnapshot.carName;
+
+    String carModel = previousSnapshot.carModel;
+    final carType = (vehicleConfig['car_type'] as String?)?.toLowerCase();
+    if (carType != null) {
+      if (carType.contains('modely') || carType == 'y') {
+        carModel = 'Model Y';
+      } else if (carType.contains('model3') || carType == '3') {
+        carModel = 'Model 3';
+      } else if (carType.contains('models') || carType == 's') {
+        carModel = 'Model S';
+      } else if (carType.contains('modelx') || carType == 'x') {
+        carModel = 'Model X';
+      }
+    }
+
+    final tpmsFl = UnitConverter.toTirePsi(
+      vehicleStateMap['tpms_pressure_fl'],
+      fallback: previousSnapshot.tirePressureFl,
+    );
+    final tpmsFr = UnitConverter.toTirePsi(
+      vehicleStateMap['tpms_pressure_fr'],
+      fallback: previousSnapshot.tirePressureFr,
+    );
+    final tpmsRl = UnitConverter.toTirePsi(
+      vehicleStateMap['tpms_pressure_rl'],
+      fallback: previousSnapshot.tirePressureRl,
+    );
+    final tpmsRr = UnitConverter.toTirePsi(
+      vehicleStateMap['tpms_pressure_rr'],
+      fallback: previousSnapshot.tirePressureRr,
+    );
+
     final currentSnapshot = VehicleSnapshot(
       timestamp: DateTime.now(),
       soc: currentSoc,
@@ -101,6 +140,13 @@ class TeslaDirectApiClient {
       odometerKm: double.parse((odometerMiles * _milesToKm).toStringAsFixed(1)),
       outsideTemp: outsideTemp,
       vehicleState: (responseObj['state'] ?? 'online').toString(),
+      carModel: carModel,
+      carName: carName,
+      softwareVersion: softwareVer,
+      tirePressureFl: tpmsFl,
+      tirePressureFr: tpmsFr,
+      tirePressureRl: tpmsRl,
+      tirePressureRr: tpmsRr,
     );
 
     return compareSnapshots(

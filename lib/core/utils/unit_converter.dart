@@ -65,6 +65,18 @@ class UnitConverter {
     }
   }
 
+  /// bar 또는 psi 압력을 psi 단위로 표준화하여 반환합니다 (1 bar ≈ 14.5038 psi).
+  /// 만약 값이 null이거나 0 이하이면 [fallback] 값을 반환합니다.
+  static double toTirePsi(num? rawPressure, {double fallback = 41.0}) {
+    if (rawPressure == null || rawPressure <= 0) return fallback;
+    final val = rawPressure.toDouble();
+    if (val < 10.0) {
+      // bar 단위 (예: 2.8 bar -> 40.6 psi)
+      return double.parse((val * 14.50377).toStringAsFixed(1));
+    }
+    return double.parse(val.toStringAsFixed(1));
+  }
+
   static String formatKrw(num amount) => '${_krwFormat.format(amount.round())}원';
 
   static String formatNumber(num value) => _krwFormat.format(value.round());

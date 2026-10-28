@@ -256,9 +256,27 @@ class TeslaMateApiClient {
     return results;
   }
 
+  /// TeslaMate 등록 차량 메타데이터 조회 (이름, 모델명, 소프트웨어 버전 등)
+  Future<Map<String, dynamic>?> fetchCarDetails() async {
+    try {
+      final dio = DioClient.create(
+        baseUrl: _normalizedApiBaseUrl,
+        bearerToken: bearerToken,
+      );
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/v1/cars/$carId',
+      );
+      final data = response.data ?? {};
+      final car = (data['data']?['car'] ?? data['car'] ?? data) as Map<String, dynamic>;
+      return car;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// TeslaMate 실시간 차량 상태 조회
   /// 1차: `:8080/api/v1/cars/{id}/status` 호출
-  /// 2차: 차량 절전/오프라인 시 `:4000` 웹 대시보드 HTML 테이블에서 최신 상태(SoC, 주행가능거리, Odometer) 파싱
+  /// 2차: 차량 절전/오프라인 시 `:4000` 웹 대시보드 HTML 테이블에서 최신 상태(SoC, 주행가능거리, Odometer, 버전) 파싱
   /// 3차: 웹 포트가 막혀있을 경우 `:8080/api/v1/cars/{id}/drives` 최신 주행 기록의 odometer_end, end_battery_level 추출
   Future<VehicleSnapshot?> fetchCarStatus() async {
     // 1차: 실시간 MQTT status API
@@ -280,6 +298,11 @@ class TeslaMateApiClient {
             status['car_details'] as Map<String, dynamic>? ?? const {};
         final climateDetails =
             status['climate_details'] as Map<String, dynamic>? ?? const {};
+        final tpmsDetails = (status['tpms_details'] ??
+                status['tpms'] ??
+                carDetails['tpms_details'] ??
+                status) as Map<String, dynamic>? ??
+            const {};
 
         final soc = ((batteryDetails['battery_level'] ??
                     status['battery_level'] ??
@@ -299,6 +322,27 @@ class TeslaMateApiClient {
                 .toDouble();
         final stateStr = (status['state'] ?? 'online').toString();
 
+        final rawModel = (carDetails['model'] ?? status['model'] ?? '').toString();
+        final carModel = rawModel.isNotEmpty
+            ? (rawModel.startsWith('Model') ? rawModel : 'Model $rawModel')
+            : 'Model Y';
+        final carName = (carDetails['name'] ?? status['name'] ?? '찌이').toString();
+        final version =
+            (carDetails['version'] ?? status['version'] ?? '2024.44.25').toString();
+
+        final tpmsFl = UnitConverter.toTirePsi(
+          tpmsDetails['tpms_pressure_fl'] ?? status['tpms_pressure_fl'],
+        );
+        final tpmsFr = UnitConverter.toTirePsi(
+          tpmsDetails['tpms_pressure_fr'] ?? status['tpms_pressure_fr'],
+        );
+        final tpmsRl = UnitConverter.toTirePsi(
+          tpmsDetails['tpms_pressure_rl'] ?? status['tpms_pressure_rl'],
+        );
+        final tpmsRr = UnitConverter.toTirePsi(
+          tpmsDetails['tpms_pressure_rr'] ?? status['tpms_pressure_rr'],
+        );
+
         return VehicleSnapshot(
           timestamp: DateTime.now(),
           soc: soc,
@@ -306,6 +350,13 @@ class TeslaMateApiClient {
           odometerKm: double.parse(odo.toStringAsFixed(1)),
           outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
           vehicleState: stateStr,
+          carModel: carModel,
+          carName: carName,
+          softwareVersion: version,
+          tirePressureFl: tpmsFl,
+          tirePressureFr: tpmsFr,
+          tirePressureRl: tpmsRl,
+          tirePressureRr: tpmsRr,
         );
       }
     } catch (_) {
@@ -318,13 +369,13 @@ class TeslaMateApiClient {
       final htmlResp = await webDio.get<String>('/');
       final html = htmlResp.data ?? '';
       if (html.isNotEmpty) {
-        // SoC 추출: data-tooltip의 100%를 피하고 실제 태그 내부 텍스트(예: > 75% <) 매칭
+        // SoC 추출
         final socMatch = RegExp(
           r'State of Charge[\s\S]*?>\s*(\d+)\s*%\s*<',
           caseSensitive: false,
         ).firstMatch(html);
 
-        // Mileage(누적 주행거리) 추출: non-breaking space(\u00a0) 및 &nbsp; 대응
+        // Mileage(누적 주행거리) 추출
         final odoMatch = RegExp(
           r'Mileage[\s\S]*?<td>\s*([\d\.,]+)',
           caseSensitive: false,
@@ -336,15 +387,21 @@ class TeslaMateApiClient {
           caseSensitive: false,
         ).firstMatch(html);
 
-        // 외기 온도 추출 (존재하는 경우)
+        // 외기 온도 추출
         final tempMatch = RegExp(
           r'Outside Temperature[\s\S]*?<td>\s*([-\d\.,]+)',
           caseSensitive: false,
         ).firstMatch(html);
 
-        // 차량 상태 추출 (offline, asleep, online)
+        // 차량 상태 추출
         final statusMatch = RegExp(
           r'Status[\s\S]*?<td>\s*([a-zA-Z]+)',
+          caseSensitive: false,
+        ).firstMatch(html);
+
+        // 소프트웨어 버전 추출
+        final versionMatch = RegExp(
+          r'Version[\s\S]*?<td>\s*([0-9\.]+[\w\.\-]*)',
           caseSensitive: false,
         ).firstMatch(html);
 
@@ -359,6 +416,7 @@ class TeslaMateApiClient {
           final rawState = (statusMatch?.group(1) ?? 'offline').toLowerCase();
           final vehicleState =
               (rawState == 'asleep' || rawState == 'offline') ? rawState : 'online';
+          final version = versionMatch?.group(1) ?? '2024.44.25';
 
           return VehicleSnapshot(
             timestamp: DateTime.now(),
@@ -367,6 +425,13 @@ class TeslaMateApiClient {
             odometerKm: double.parse(odoKm.toStringAsFixed(1)),
             outsideTemp: double.parse(outsideTemp.toStringAsFixed(1)),
             vehicleState: vehicleState,
+            carModel: 'Model Y',
+            carName: '찌이',
+            softwareVersion: version,
+            tirePressureFl: 41.0,
+            tirePressureFr: 41.0,
+            tirePressureRl: 41.0,
+            tirePressureRr: 41.0,
           );
         }
       }
@@ -406,6 +471,13 @@ class TeslaMateApiClient {
           odometerKm: double.parse(odo.toStringAsFixed(1)),
           outsideTemp: double.parse(temp.toStringAsFixed(1)),
           vehicleState: 'offline',
+          carModel: 'Model Y',
+          carName: '찌이',
+          softwareVersion: '2024.44.25',
+          tirePressureFl: 41.0,
+          tirePressureFr: 41.0,
+          tirePressureRl: 41.0,
+          tirePressureRr: 41.0,
         );
       }
     } catch (_) {
