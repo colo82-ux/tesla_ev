@@ -53,10 +53,66 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: '데이터 새로고침',
-            onPressed: () => notifier.loadAll(),
-            icon: const Icon(Icons.refresh_rounded),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sync_rounded),
+            tooltip: '동기화 및 새로고침',
+            onSelected: (val) async {
+              if (val == 'sync') {
+                final res = await notifier.syncNow();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res.message),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } else if (val == 'full_sync') {
+                final res = await notifier.syncNow(fullSync: true);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res.message),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } else if (val == 'reload') {
+                await notifier.loadAll();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.sync_rounded, size: 20),
+                    SizedBox(width: 8),
+                    Text('지금 동기화 (증분)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'full_sync',
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded, size: 20, color: TeslaColors.electricBlue),
+                    SizedBox(width: 8),
+                    Text('전체 재동기화 (과거/누락 충전 포함)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'reload',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 20),
+                    SizedBox(width: 8),
+                    Text('로컬 데이터 다시 불러오기'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

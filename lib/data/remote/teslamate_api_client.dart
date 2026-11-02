@@ -62,7 +62,12 @@ class TeslaMateApiClient {
     );
 
     final data = response.data ?? {};
-    final drivesRaw = (data['data']?['drives'] ?? data['drives'] ?? []) as List<dynamic>;
+    final dynamic rawData = data['data'];
+    final List<dynamic> drivesRaw = rawData is List
+        ? rawData
+        : (rawData is Map && rawData['drives'] is List
+            ? rawData['drives'] as List<dynamic>
+            : (data['drives'] is List ? data['drives'] as List<dynamic> : []));
 
     final List<DriveLog> results = [];
     for (final item in drivesRaw) {
@@ -170,8 +175,12 @@ class TeslaMateApiClient {
     );
 
     final data = response.data ?? {};
-    final chargesRaw =
-        ((data['data']?['charges'] ?? data['charges']) as List<dynamic>?) ?? [];
+    final dynamic rawData = data['data'];
+    final List<dynamic> chargesRaw = rawData is List
+        ? rawData
+        : (rawData is Map && rawData['charges'] is List
+            ? rawData['charges'] as List<dynamic>
+            : (data['charges'] is List ? data['charges'] as List<dynamic> : []));
 
     final List<ChargeLog> results = [];
     for (final item in chargesRaw) {
@@ -179,12 +188,24 @@ class TeslaMateApiClient {
       final date = DateTime.parse(
         (map['start_date'] ?? map['date']) as String,
       ).toLocal();
-      if (since != null && !date.isAfter(since)) {
-        continue;
+
+      // 충전 종료 시각(end_date)이 있으면 end_date를 기준으로도 확인
+      // 충전 세션 진행 중에 앱을 켜서 since(lastSync)가 기록되었더라도 충전 완료 후 누락되지 않도록 방지
+      final rawEndDate = map['end_date'] ?? map['end_time'];
+      final endDate = rawEndDate != null ? DateTime.tryParse(rawEndDate.toString())?.toLocal() : null;
+      final effectiveDate = endDate ?? date;
+
+      // 12시간 버퍼를 두어 충전 중 동기화 시점 누락 방지 (로컬 DB의 UNIQUE 제약조건으로 중복 없이 Upsert)
+      if (since != null) {
+        final bufferSince = since.subtract(const Duration(hours: 12));
+        if (!effectiveDate.isAfter(bufferSince)) {
+          continue;
+        }
       }
 
       final addedEnergyKwh = ((map['charge_energy_added'] ??
                   map['added_energy_kwh'] ??
+                  map['energy_added'] ??
                   0.0) as num)
               .toDouble();
       if (addedEnergyKwh <= 0.1) continue;
