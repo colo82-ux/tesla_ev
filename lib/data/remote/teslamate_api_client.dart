@@ -241,12 +241,13 @@ class TeslaMateApiClient {
         orElse: () => ChargePreset.defaultPresets.first,
       );
 
-      final unitPriceKrw =
-          ((map['unit_price_krw'] ?? preset.unitPriceKrw) as num).toInt();
-      final totalCostKrw = ((map['cost'] ??
-                  map['total_cost_krw'] ??
-                  (addedEnergyKwh * unitPriceKrw)) as num)
-              .round();
+      final unitPriceKrw = preset.unitPriceKrw;
+      final rawCost = (map['cost'] ?? map['total_cost_krw']) as num?;
+      // TeslaMate에서 지오펜스 비용을 지정하지 않아 cost가 0(또는 null)으로 반환된 경우,
+      // 앱에서 설정한 충전 단가 프리셋(원/kWh) * 충전 전력량으로 자동 계산
+      final totalCostKrw = (rawCost != null && rawCost > 0)
+          ? rawCost.round()
+          : (addedEnergyKwh * unitPriceKrw).round();
 
       final batteryDetails =
           map['battery_details'] as Map<String, dynamic>? ?? const {};

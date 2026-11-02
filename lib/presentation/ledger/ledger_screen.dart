@@ -205,6 +205,13 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _ChargeTimelineCard(
                           charge: c,
+                          onEdit: c.id != null
+                              ? () => _showEditChargeDialog(
+                                  context,
+                                  c,
+                                  appState.chargePresets,
+                                )
+                              : null,
                           onDelete: c.id != null
                               ? () => ref
                                   .read(teslaAppProvider.notifier)
@@ -218,6 +225,9 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _ExpenseTimelineCard(
                           expense: e,
+                          onEdit: e.id != null
+                              ? () => _showEditExpenseDialog(context, e)
+                              : null,
                           onDelete: e.id != null
                               ? () => ref
                                   .read(teslaAppProvider.notifier)
@@ -310,14 +320,271 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
       ),
     );
   }
+
+  /// 과거 충전 기록 수동 편집 다이얼로그
+  void _showEditChargeDialog(
+    BuildContext context,
+    ChargeLog charge,
+    List<ChargePreset> presets,
+  ) {
+    String selectedLocation = charge.locationType;
+    final kwhController =
+        TextEditingController(text: charge.addedEnergyKwh.toString());
+    final unitPriceController =
+        TextEditingController(text: charge.unitPriceKrw.toString());
+    final totalCostController =
+        TextEditingController(text: charge.totalCostKrw.toString());
+    final startSocController =
+        TextEditingController(text: charge.startSoc.toString());
+    final endSocController =
+        TextEditingController(text: charge.endSoc.toString());
+
+    void updateCost() {
+      final kwh = double.tryParse(kwhController.text) ?? 0.0;
+      final price = int.tryParse(unitPriceController.text) ?? 0;
+      totalCostController.text = (kwh * price).round().toString();
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: TeslaColors.surface,
+          title: const Text('충전 기록 편집'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: ChargeLog.locationTypes.contains(selectedLocation)
+                      ? selectedLocation
+                      : '기타',
+                  dropdownColor: TeslaColors.surfaceElevated,
+                  decoration: const InputDecoration(labelText: '충전 장소 / 유형'),
+                  items: ChargeLog.locationTypes.map((loc) {
+                    return DropdownMenuItem(value: loc, child: Text(loc));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setDialogState(() {
+                      selectedLocation = val;
+                      final matched = presets.firstWhere(
+                        (p) => p.locationType == val,
+                        orElse: () => ChargePreset.defaultPresets.first,
+                      );
+                      unitPriceController.text =
+                          matched.unitPriceKrw.toString();
+                      updateCost();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: kwhController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: '충전 전력량',
+                    suffixText: 'kWh',
+                  ),
+                  onChanged: (_) => setDialogState(updateCost),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: unitPriceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '적용 단가',
+                    suffixText: '원/kWh',
+                  ),
+                  onChanged: (_) => setDialogState(updateCost),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: totalCostController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '총 충전 요금',
+                    suffixText: '원',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: startSocController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '시작 배터리',
+                          suffixText: '%',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: endSocController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: '종료 배터리',
+                          suffixText: '%',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final kwh = double.tryParse(kwhController.text) ??
+                    charge.addedEnergyKwh;
+                final price = int.tryParse(unitPriceController.text) ??
+                    charge.unitPriceKrw;
+                final cost = int.tryParse(totalCostController.text) ??
+                    (kwh * price).round();
+                final startSoc = int.tryParse(startSocController.text) ??
+                    charge.startSoc;
+                final endSoc = int.tryParse(endSocController.text) ??
+                    charge.endSoc;
+
+                final updated = charge.copyWith(
+                  locationType: selectedLocation,
+                  addedEnergyKwh: kwh,
+                  unitPriceKrw: price,
+                  totalCostKrw: cost,
+                  startSoc: startSoc,
+                  endSoc: endSoc,
+                );
+
+                await ref
+                    .read(teslaAppProvider.notifier)
+                    .updateChargeLog(updated);
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('충전 기록 및 차계부 충전비가 수정되었습니다.'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('저장'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 과거 일반 지출 내역 수동 편집 다이얼로그
+  void _showEditExpenseDialog(
+    BuildContext context,
+    ExpenseLog expense,
+  ) {
+    String selectedCategory = expense.category;
+    final amountController =
+        TextEditingController(text: expense.amountKrw.toString());
+    final memoController = TextEditingController(text: expense.memo);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: TeslaColors.surface,
+          title: const Text('지출 내역 편집'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: ExpenseLog.categories.contains(selectedCategory)
+                      ? selectedCategory
+                      : '충전비',
+                  dropdownColor: TeslaColors.surfaceElevated,
+                  decoration: const InputDecoration(labelText: '지출 항목'),
+                  items: ExpenseLog.categories.map((cat) {
+                    return DropdownMenuItem(value: cat, child: Text(cat));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setDialogState(() => selectedCategory = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '지출 금액',
+                    suffixText: '원',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: memoController,
+                  decoration: const InputDecoration(labelText: '메모 / 내역 설명'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = int.tryParse(amountController.text) ??
+                    expense.amountKrw;
+                final memo = memoController.text.trim();
+
+                final updated = expense.copyWith(
+                  category: selectedCategory,
+                  amountKrw: amount,
+                  memo: memo,
+                );
+
+                await ref
+                    .read(teslaAppProvider.notifier)
+                    .updateExpenseLog(updated);
+
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('지출 내역이 수정되었습니다.'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('저장'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ChargeTimelineCard extends StatelessWidget {
   final ChargeLog charge;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _ChargeTimelineCard({
     required this.charge,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -399,22 +666,41 @@ class _ChargeTimelineCard extends StatelessWidget {
                     color: TeslaColors.textPrimary,
                   ),
                 ),
-                if (onDelete != null) ...[
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        size: 18,
-                        color: TeslaColors.textMuted,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onEdit != null)
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: TeslaColors.textSecondary,
+                          ),
+                          onPressed: onEdit,
+                        ),
                       ),
-                      onPressed: onDelete,
-                    ),
-                  ),
-                ],
+                    if (onDelete != null) ...[
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: TeslaColors.textMuted,
+                          ),
+                          onPressed: onDelete,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ],
@@ -426,10 +712,12 @@ class _ChargeTimelineCard extends StatelessWidget {
 
 class _ExpenseTimelineCard extends StatelessWidget {
   final ExpenseLog expense;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _ExpenseTimelineCard({
     required this.expense,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -492,22 +780,41 @@ class _ExpenseTimelineCard extends StatelessWidget {
                     color: TeslaColors.warningAmber,
                   ),
                 ),
-                if (onDelete != null) ...[
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        size: 18,
-                        color: TeslaColors.textMuted,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onEdit != null)
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: TeslaColors.textSecondary,
+                          ),
+                          onPressed: onEdit,
+                        ),
                       ),
-                      onPressed: onDelete,
-                    ),
-                  ),
-                ],
+                    if (onDelete != null) ...[
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: TeslaColors.textMuted,
+                          ),
+                          onPressed: onDelete,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ],

@@ -101,15 +101,30 @@ class SyncService {
       final driveCount = await _driveRepository.upsertDrivesBatch(drives);
       final chargeCount = await _chargeRepository.upsertChargesBatch(charges);
 
-      // 새로운 충전 기록이 있으면 차계부 충전비 내역에도 자동 반영 (중복 등록 방지)
+      // 충전 기록을 차계부 충전비 내역에도 자동 동기화 (단가 변동 시 금액 갱신 및 신규 등록)
       final existingExpenses = await _expenseRepository.getAllExpenses();
       for (final c in charges) {
         final datePrefix = c.date.toIso8601String().substring(0, 16);
-        final alreadyExists = existingExpenses.any((e) =>
-            e.category == '충전비' &&
-            e.date.toIso8601String().startsWith(datePrefix) &&
-            e.amountKrw == c.totalCostKrw);
-        if (!alreadyExists) {
+        final existingExpense = existingExpenses.cast<ExpenseLog?>().firstWhere(
+              (e) =>
+                  e?.category == '충전비' &&
+                  e!.date.toIso8601String().startsWith(datePrefix),
+              orElse: () => null,
+            );
+
+        if (existingExpense != null) {
+          // 기존에 이미 등록된 충전비 내역이 있는 경우, 단가 재계산 등으로 금액이 달라졌다면 최신 금액으로 갱신
+          if (existingExpense.amountKrw != c.totalCostKrw && existingExpense.id != null) {
+            await _expenseRepository.updateExpense(
+              existingExpense.copyWith(
+                amountKrw: c.totalCostKrw,
+                memo:
+                    '[TeslaMate] ${c.locationType} (${c.addedEnergyKwh}kWh, ${c.startSoc}%→${c.endSoc}%)',
+              ),
+            );
+          }
+        } else {
+          // 신규 충전비 내역 등록
           await _expenseRepository.insertExpense(
             ExpenseLog(
               date: c.date,
