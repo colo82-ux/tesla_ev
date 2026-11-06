@@ -183,7 +183,7 @@ class EfficiencyScreen extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: TeslaColors.teslaRed,
+              backgroundColor: TeslaColors.dangerRed,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -359,10 +359,10 @@ class _TemperatureBracketBarChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final brackets = TempBracket.values;
     final barColors = [
-      const Color(0xFF38BDF8), // 영하: 아이스 블루
-      TeslaColors.electricBlue, // 0~15도: 블루
-      TeslaColors.batteryGreen, // 15~25도: 최적 구간 그린
-      TeslaColors.warningAmber, // 25도 이상: 앰버
+      TeslaColors.electricBlue, // 영하: Dracula Cyan (#8BE9FD)
+      TeslaColors.purpleAccent, // 0~15도: Dracula Purple (#BD93F9)
+      TeslaColors.batteryGreen, // 15~25도: 최적 구간 Dracula Green (#50FA7B)
+      TeslaColors.warningAmber, // 25도 이상: Dracula Orange (#FFB86C)
     ];
 
     return Card(

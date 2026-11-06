@@ -95,6 +95,6 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "Tesla_EV Android APK (Build #${{ github.run_number }})"
-          body: "차계부 & 충전 지출 날짜 선택 및 수정 기능 반영 빌드"
+          body: "Antigravity 다크 + Dracula 테마 개편 및 차계부 지출 날짜 입력·수정 반영 빌드"
           files: build/app/outputs/flutter-apk/tesla_ev-release.apk
           make_latest: true
