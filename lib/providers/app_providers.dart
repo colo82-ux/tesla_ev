@@ -437,18 +437,23 @@ class TeslaAppNotifier extends StateNotifier<TeslaAppState> {
     await loadAll();
   }
 
-  /// 충전 기록 수정 (단가/금액/위치 등 과거 이력 편집 시, 연동된 차계부 충전비 내역도 자동 동기화)
-  Future<void> updateChargeLog(ChargeLog updatedLog) async {
+  /// 충전 기록 수정 (단가/금액/위치/날짜 등 과거 이력 편집 시, 연동된 차계부 충전비 내역도 자동 동기화)
+  Future<void> updateChargeLog(
+    ChargeLog updatedLog, {
+    DateTime? previousDate,
+  }) async {
     await _chargeRepository.updateCharge(updatedLog);
 
-    // 연관된 차계부 충전비 지출 내역도 함께 금액 및 메모 동기화
-    final datePrefix = updatedLog.date.toIso8601String().substring(0, 16);
+    // 연관된 차계부 충전비 지출 내역도 함께 날짜, 금액 및 메모 동기화
+    final targetDate = previousDate ?? updatedLog.date;
+    final datePrefix = targetDate.toIso8601String().substring(0, 16);
     final expenses = await _expenseRepository.getAllExpenses();
     for (final exp in expenses) {
       if (exp.category == '충전비' &&
           exp.date.toIso8601String().startsWith(datePrefix)) {
         await _expenseRepository.updateExpense(
           exp.copyWith(
+            date: updatedLog.date,
             amountKrw: updatedLog.totalCostKrw,
             memo:
                 '[TeslaMate] ${updatedLog.locationType} (${updatedLog.addedEnergyKwh}kWh, ${updatedLog.startSoc}%→${updatedLog.endSoc}%)',

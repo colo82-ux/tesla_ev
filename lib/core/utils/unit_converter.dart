@@ -18,6 +18,7 @@ class UnitConverter {
   static final NumberFormat _krwFormat = NumberFormat('#,###', 'ko_KR');
   static final NumberFormat _decimal1Format = NumberFormat('#,##0.0', 'ko_KR');
   static final NumberFormat _decimal2Format = NumberFormat('#,##0.00', 'ko_KR');
+  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
   static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm');
   static final DateFormat _shortDateFormat = DateFormat('MM/dd (E)', 'ko_KR');
 
@@ -84,6 +85,8 @@ class UnitConverter {
   static String formatDecimal1(num value) => _decimal1Format.format(value);
 
   static String formatDecimal2(num value) => _decimal2Format.format(value);
+
+  static String formatDate(DateTime dt) => _dateFormat.format(dt);
 
   static String formatDateTime(DateTime dt) => _dateTimeFormat.format(dt);
 

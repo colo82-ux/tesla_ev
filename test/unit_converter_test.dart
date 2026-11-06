@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tesla_ev/core/utils/unit_converter.dart';
+import 'package:tesla_ev/data/models/expense_log.dart';
 import 'package:tesla_ev/data/models/vehicle_snapshot.dart';
 import 'package:tesla_ev/data/remote/tesla_direct_api_client.dart';
 
@@ -26,6 +27,22 @@ void main() {
       expect(UnitConverter.classifyTemperature(10.0), TempBracket.cold);
       expect(UnitConverter.classifyTemperature(20.0), TempBracket.mild);
       expect(UnitConverter.classifyTemperature(28.0), TempBracket.hot);
+    });
+
+    test('날짜 포맷팅 및 지출 내역 날짜 수정(copyWith)이 정상 동작한다', () {
+      final initialDate = DateTime(2026, 11, 1, 14, 30);
+      expect(UnitConverter.formatDate(initialDate), '2026-11-01');
+
+      final expense = ExpenseLog(
+        id: 1,
+        date: initialDate,
+        category: '세차/정비',
+        amountKrw: 25000,
+        memo: '세차',
+      );
+      final updatedDate = DateTime(2026, 10, 25, 14, 30);
+      final updatedExpense = expense.copyWith(date: updatedDate);
+      expect(UnitConverter.formatDate(updatedExpense.date), '2026-10-25');
     });
   });
 

@@ -11,6 +11,8 @@ jobs:
   build-android-apk:
     name: Build Release APK (Flutter)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: 1. Checkout Repository
@@ -85,3 +87,14 @@ jobs:
           name: tesla_ev-android-apk
           path: build/app/outputs/flutter-apk/tesla_ev-release.apk
           retention-days: 30
+
+      - name: 10. Publish APK to GitHub Releases (Direct Download)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Tesla_EV Android APK (Build #${{ github.run_number }})"
+          body: "차계부 & 충전 지출 날짜 선택 및 수정 기능 반영 빌드"
+          files: build/app/outputs/flutter-apk/tesla_ev-release.apk
+          make_latest: true

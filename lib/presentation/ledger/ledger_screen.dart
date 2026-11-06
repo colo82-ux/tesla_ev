@@ -327,6 +327,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     ChargeLog charge,
     List<ChargePreset> presets,
   ) {
+    DateTime selectedDate = charge.date;
     String selectedLocation = charge.locationType;
     final kwhController =
         TextEditingController(text: charge.addedEnergyKwh.toString());
@@ -356,6 +357,55 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2015, 1, 1),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      helpText: '충전 날짜 수정',
+                      cancelText: '취소',
+                      confirmText: '변경',
+                    );
+                    if (picked != null) {
+                      setDialogState(() {
+                        selectedDate = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          selectedDate.hour,
+                          selectedDate.minute,
+                        );
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '충전 날짜',
+                      prefixIcon: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 18,
+                        color: TeslaColors.electricBlue,
+                      ),
+                      suffixIcon: Icon(
+                        Icons.edit_calendar_rounded,
+                        size: 18,
+                        color: TeslaColors.textSecondary,
+                      ),
+                    ),
+                    child: Text(
+                      UnitConverter.formatDate(selectedDate),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: TeslaColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: ChargeLog.locationTypes.contains(selectedLocation)
                       ? selectedLocation
@@ -457,6 +507,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                     charge.endSoc;
 
                 final updated = charge.copyWith(
+                  date: selectedDate,
                   locationType: selectedLocation,
                   addedEnergyKwh: kwh,
                   unitPriceKrw: price,
@@ -467,7 +518,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
 
                 await ref
                     .read(teslaAppProvider.notifier)
-                    .updateChargeLog(updated);
+                    .updateChargeLog(updated, previousDate: charge.date);
 
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
@@ -491,6 +542,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
     BuildContext context,
     ExpenseLog expense,
   ) {
+    DateTime selectedDate = expense.date;
     String selectedCategory = expense.category;
     final amountController =
         TextEditingController(text: expense.amountKrw.toString());
@@ -507,6 +559,55 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2015, 1, 1),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      helpText: '지출 날짜 수정',
+                      cancelText: '취소',
+                      confirmText: '변경',
+                    );
+                    if (picked != null) {
+                      setDialogState(() {
+                        selectedDate = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          selectedDate.hour,
+                          selectedDate.minute,
+                        );
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '지출 날짜',
+                      prefixIcon: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 18,
+                        color: TeslaColors.electricBlue,
+                      ),
+                      suffixIcon: Icon(
+                        Icons.edit_calendar_rounded,
+                        size: 18,
+                        color: TeslaColors.textSecondary,
+                      ),
+                    ),
+                    child: Text(
+                      UnitConverter.formatDate(selectedDate),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: TeslaColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: ExpenseLog.categories.contains(selectedCategory)
                       ? selectedCategory
@@ -550,6 +651,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> {
                 final memo = memoController.text.trim();
 
                 final updated = expense.copyWith(
+                  date: selectedDate,
                   category: selectedCategory,
                   amountKrw: amount,
                   memo: memo,
@@ -843,7 +945,8 @@ class _QuickEntryBottomSheetState
     extends ConsumerState<_QuickEntryBottomSheet> {
   bool _isChargeMode = true;
 
-  // 충전 입력 컨트롤러
+  // 충전 입력 컨트롤러 및 날짜
+  DateTime _selectedChargeDate = DateTime.now();
   late String _selectedLocationType;
   late TextEditingController _addedKwhCtrl;
   late TextEditingController _unitPriceCtrl;
@@ -851,7 +954,8 @@ class _QuickEntryBottomSheetState
   late TextEditingController _startSocCtrl;
   late TextEditingController _endSocCtrl;
 
-  // 일반 지출 입력 컨트롤러
+  // 일반 지출 입력 컨트롤러 및 날짜
+  DateTime _selectedExpenseDate = DateTime.now();
   String _selectedExpenseCategory = ExpenseLog.categories.first;
   final TextEditingController _expenseAmountCtrl =
       TextEditingController(text: '25000');
@@ -889,6 +993,34 @@ class _QuickEntryBottomSheetState
       _unitPriceCtrl.text = preset.unitPriceKrw.toString();
       _recalculateTotalCost();
     });
+  }
+
+  Future<void> _pickDate({
+    required DateTime current,
+    required String helpText,
+    required ValueChanged<DateTime> onSelected,
+  }) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2015, 1, 1),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: helpText,
+      cancelText: '취소',
+      confirmText: '선택',
+    );
+    if (picked != null) {
+      final now = DateTime.now();
+      onSelected(
+        DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          now.hour,
+          now.minute,
+        ),
+      );
+    }
   }
 
   @override
@@ -937,6 +1069,38 @@ class _QuickEntryBottomSheetState
             ),
             const SizedBox(height: 16),
             if (_isChargeMode) ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _pickDate(
+                  current: _selectedChargeDate,
+                  helpText: '충전 날짜 선택',
+                  onSelected: (dt) => setState(() => _selectedChargeDate = dt),
+                ),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: '충전 날짜',
+                    prefixIcon: Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: TeslaColors.electricBlue,
+                    ),
+                    suffixIcon: Icon(
+                      Icons.edit_calendar_rounded,
+                      size: 18,
+                      color: TeslaColors.textSecondary,
+                    ),
+                  ),
+                  child: Text(
+                    UnitConverter.formatDate(_selectedChargeDate),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: TeslaColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
               const Text(
                 '충전 단가 프리셋 선택 (자동 요금 계산)',
                 style: TextStyle(
@@ -1028,7 +1192,7 @@ class _QuickEntryBottomSheetState
 
                     await ref.read(teslaAppProvider.notifier).addChargeLog(
                           ChargeLog(
-                            date: DateTime.now(),
+                            date: _selectedChargeDate,
                             locationType: _selectedLocationType,
                             addedEnergyKwh: kwh,
                             unitPriceKrw: unitPrice,
@@ -1043,6 +1207,38 @@ class _QuickEntryBottomSheetState
                 ),
               ),
             ] else ...[
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _pickDate(
+                  current: _selectedExpenseDate,
+                  helpText: '지출 날짜 선택',
+                  onSelected: (dt) => setState(() => _selectedExpenseDate = dt),
+                ),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: '지출 날짜',
+                    prefixIcon: Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: TeslaColors.electricBlue,
+                    ),
+                    suffixIcon: Icon(
+                      Icons.edit_calendar_rounded,
+                      size: 18,
+                      color: TeslaColors.textSecondary,
+                    ),
+                  ),
+                  child: Text(
+                    UnitConverter.formatDate(_selectedExpenseDate),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: TeslaColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _selectedExpenseCategory,
                 decoration: const InputDecoration(labelText: '지출 카테고리'),
@@ -1083,7 +1279,7 @@ class _QuickEntryBottomSheetState
 
                     await ref.read(teslaAppProvider.notifier).addExpenseLog(
                           ExpenseLog(
-                            date: DateTime.now(),
+                            date: _selectedExpenseDate,
                             category: _selectedExpenseCategory,
                             amountKrw: amount,
                             memo: memo,
